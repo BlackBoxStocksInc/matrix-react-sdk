@@ -15,26 +15,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React from 'react';
-import ReactTestUtils from 'react-dom/test-utils';
-import ReactDOM from 'react-dom';
-import { Room } from 'matrix-js-sdk/src/models/room';
-import { RoomMember } from 'matrix-js-sdk/src/models/room-member';
+import React, { Component } from "react";
+import ReactTestUtils from "react-dom/test-utils";
+import ReactDOM from "react-dom";
+import { Room } from "matrix-js-sdk/src/models/room";
+import { RoomMember } from "matrix-js-sdk/src/models/room-member";
 import { User } from "matrix-js-sdk/src/models/user";
 import { compare } from "matrix-js-sdk/src/utils";
+import { MatrixClient, RoomState } from "matrix-js-sdk/src/matrix";
 
-import { MatrixClientPeg } from '../../../../src/MatrixClientPeg';
-import * as TestUtils from '../../../test-utils';
+import { MatrixClientPeg } from "../../../../src/MatrixClientPeg";
+import * as TestUtils from "../../../test-utils";
 import MemberList from "../../../../src/components/views/rooms/MemberList";
-import MemberTile from '../../../../src/components/views/rooms/MemberTile';
-import { SDKContext } from '../../../../src/contexts/SDKContext';
-import { TestSdkContext } from '../../../TestSdkContext';
+import MemberTile from "../../../../src/components/views/rooms/MemberTile";
+import { SDKContext } from "../../../../src/contexts/SDKContext";
+import { TestSdkContext } from "../../../TestSdkContext";
 
 function generateRoomId() {
-    return '!' + Math.random().toString().slice(2, 10) + ':domain';
+    return "!" + Math.random().toString().slice(2, 10) + ":domain";
 }
 
-describe('MemberList', () => {
+describe("MemberList", () => {
     function createRoom(opts = {}) {
         const room = new Room(generateRoomId(), null, client.getUserId());
         if (opts) {
@@ -43,22 +44,22 @@ describe('MemberList', () => {
         return room;
     }
 
-    let parentDiv = null;
-    let client = null;
-    let root = null;
-    let memberListRoom;
-    let memberList = null;
+    let parentDiv: HTMLDivElement = null;
+    let client: MatrixClient = null;
+    let root: Component = null;
+    let memberListRoom: Room;
+    let memberList: MemberList = null;
 
-    let adminUsers = [];
-    let moderatorUsers = [];
-    let defaultUsers = [];
+    let adminUsers: RoomMember[] = [];
+    let moderatorUsers: RoomMember[] = [];
+    let defaultUsers: RoomMember[] = [];
 
-    beforeEach(function() {
+    beforeEach(function () {
         TestUtils.stubClient();
         client = MatrixClientPeg.get();
         client.hasLazyLoadMembersEnabled = () => false;
 
-        parentDiv = document.createElement('div');
+        parentDiv = document.createElement("div");
         document.body.appendChild(parentDiv);
 
         // Make room
@@ -76,7 +77,7 @@ describe('MemberList', () => {
             adminUser.powerLevel = 100;
             adminUser.user = new User(adminUser.userId);
             adminUser.user.currentlyActive = true;
-            adminUser.user.presence = 'online';
+            adminUser.user.presence = "online";
             adminUser.user.lastPresenceTs = 1000;
             adminUser.user.lastActiveAgo = 10;
             adminUsers.push(adminUser);
@@ -86,7 +87,7 @@ describe('MemberList', () => {
             moderatorUser.powerLevel = 50;
             moderatorUser.user = new User(moderatorUser.userId);
             moderatorUser.user.currentlyActive = true;
-            moderatorUser.user.presence = 'online';
+            moderatorUser.user.presence = "online";
             moderatorUser.user.lastPresenceTs = 1000;
             moderatorUser.user.lastActiveAgo = 10;
             moderatorUsers.push(moderatorUser);
@@ -96,7 +97,7 @@ describe('MemberList', () => {
             defaultUser.powerLevel = 0;
             defaultUser.user = new User(defaultUser.userId);
             defaultUser.user.currentlyActive = true;
-            defaultUser.user.presence = 'online';
+            defaultUser.user.presence = "online";
             defaultUser.user.lastPresenceTs = 1000;
             defaultUser.user.lastActiveAgo = 10;
             defaultUsers.push(defaultUser);
@@ -109,31 +110,30 @@ describe('MemberList', () => {
         memberListRoom.currentState = {
             members: {},
             getMember: jest.fn(),
-            getStateEvents: (eventType, stateKey) => stateKey === undefined ? [] : null, // ignore 3pid invites
-        };
+            getStateEvents: ((eventType, stateKey) =>
+                stateKey === undefined ? [] : null) as RoomState["getStateEvents"], // ignore 3pid invites
+        } as unknown as RoomState;
         for (const member of [...adminUsers, ...moderatorUsers, ...defaultUsers]) {
             memberListRoom.currentState.members[member.userId] = member;
         }
 
-        const gatherWrappedRef = (r) => {
+        const gatherWrappedRef = (r: MemberList) => {
             memberList = r;
         };
         const context = new TestSdkContext();
         context.client = client;
         root = ReactDOM.render(
-            (
-                <SDKContext.Provider value={context}>
-                    <MemberList
-                        searchQuery=""
-                        onClose={jest.fn()}
-                        onSearchQueryChanged={jest.fn()}
-                        roomId={memberListRoom.roomId}
-                        ref={gatherWrappedRef}
-                    />
-                </SDKContext.Provider>
-            ),
+            <SDKContext.Provider value={context}>
+                <MemberList
+                    searchQuery=""
+                    onClose={jest.fn()}
+                    onSearchQueryChanged={jest.fn()}
+                    roomId={memberListRoom.roomId}
+                    ref={gatherWrappedRef}
+                />
+            </SDKContext.Provider>,
             parentDiv,
-        );
+        ) as unknown as Component;
     });
 
     afterEach((done) => {
@@ -146,7 +146,7 @@ describe('MemberList', () => {
         done();
     });
 
-    function expectOrderedByPresenceAndPowerLevel(memberTiles, isPresenceEnabled) {
+    function expectOrderedByPresenceAndPowerLevel(memberTiles: MemberTile[], isPresenceEnabled: boolean) {
         let prevMember = null;
         for (const tile of memberTiles) {
             const memberA = prevMember;
@@ -166,15 +166,15 @@ describe('MemberList', () => {
             let groupChange = false;
 
             if (isPresenceEnabled) {
-                const convertPresence = (p) => p === 'unavailable' ? 'online' : p;
-                const presenceIndex = p => {
-                    const order = ['active', 'online', 'offline'];
+                const convertPresence = (p: string) => (p === "unavailable" ? "online" : p);
+                const presenceIndex = (p: string) => {
+                    const order = ["active", "online", "offline"];
                     const idx = order.indexOf(convertPresence(p));
                     return idx === -1 ? order.length : idx; // unknown states at the end
                 };
 
-                const idxA = presenceIndex(userA.currentlyActive ? 'active' : userA.presence);
-                const idxB = presenceIndex(userB.currentlyActive ? 'active' : userB.presence);
+                const idxA = presenceIndex(userA.currentlyActive ? "active" : userA.presence);
+                const idxB = presenceIndex(userB.currentlyActive ? "active" : userB.presence);
                 console.log("Comparing presence groups...");
                 expect(idxB).toBeGreaterThanOrEqual(idxA);
                 groupChange = idxA !== idxB;
@@ -203,8 +203,8 @@ describe('MemberList', () => {
             }
 
             if (!groupChange) {
-                const nameA = memberA.name[0] === '@' ? memberA.name.slice(1) : memberA.name;
-                const nameB = memberB.name[0] === '@' ? memberB.name.slice(1) : memberB.name;
+                const nameA = memberA.name[0] === "@" ? memberA.name.slice(1) : memberA.name;
+                const nameB = memberB.name[0] === "@" ? memberB.name.slice(1) : memberB.name;
                 const nameCompare = compare(nameB, nameA);
                 console.log("Comparing name");
                 expect(nameCompare).toBeGreaterThanOrEqual(0);
@@ -214,8 +214,8 @@ describe('MemberList', () => {
         }
     }
 
-    function itDoesOrderMembersCorrectly(enablePresence) {
-        describe('does order members correctly', () => {
+    function itDoesOrderMembersCorrectly(enablePresence: boolean) {
+        describe("does order members correctly", () => {
             // Note: even if presence is disabled, we still expect that the presence
             // tests will pass. All expectOrderedByPresenceAndPowerLevel does is ensure
             // the order is perceived correctly, regardless of what we did to the members.
@@ -223,22 +223,22 @@ describe('MemberList', () => {
             // Each of the 4 tests here is done to prove that the member list can meet
             // all 4 criteria independently. Together, they should work.
 
-            it('by presence state', () => {
+            it("by presence state", () => {
                 // Intentionally pick users that will confuse the power level sorting
                 const activeUsers = [defaultUsers[0]];
                 const onlineUsers = [adminUsers[0]];
                 const offlineUsers = [...moderatorUsers, ...adminUsers.slice(1), ...defaultUsers.slice(1)];
                 activeUsers.forEach((u) => {
                     u.user.currentlyActive = true;
-                    u.user.presence = 'online';
+                    u.user.presence = "online";
                 });
                 onlineUsers.forEach((u) => {
                     u.user.currentlyActive = false;
-                    u.user.presence = 'online';
+                    u.user.presence = "online";
                 });
                 offlineUsers.forEach((u) => {
                     u.user.currentlyActive = false;
-                    u.user.presence = 'offline';
+                    u.user.presence = "offline";
                 });
 
                 // Bypass all the event listeners and skip to the good part
@@ -249,18 +249,18 @@ describe('MemberList', () => {
                 expectOrderedByPresenceAndPowerLevel(tiles, enablePresence);
             });
 
-            it('by power level', () => {
+            it("by power level", () => {
                 // We already have admin, moderator, and default users so leave them alone
 
                 // Bypass all the event listeners and skip to the good part
-                memberList._showPresence = enablePresence;
+                memberList.showPresence = enablePresence;
                 memberList.updateListNow();
 
                 const tiles = ReactTestUtils.scryRenderedComponentsWithType(root, MemberTile);
                 expectOrderedByPresenceAndPowerLevel(tiles, enablePresence);
             });
 
-            it('by last active timestamp', () => {
+            it("by last active timestamp", () => {
                 // Intentionally pick users that will confuse the power level sorting
                 // lastActiveAgoTs == lastPresenceTs - lastActiveAgo
                 const activeUsers = [defaultUsers[0]];
@@ -290,7 +290,7 @@ describe('MemberList', () => {
                 expectOrderedByPresenceAndPowerLevel(tiles, enablePresence);
             });
 
-            it('by name', () => {
+            it("by name", () => {
                 // Intentionally put everyone on the same level to force a name comparison
                 const allUsers = [...adminUsers, ...moderatorUsers, ...defaultUsers];
                 allUsers.forEach((u) => {
@@ -311,12 +311,11 @@ describe('MemberList', () => {
         });
     }
 
-    describe('when presence is enabled', () => {
+    describe("when presence is enabled", () => {
         itDoesOrderMembersCorrectly(true);
     });
 
-    describe('when presence is not enabled', () => {
+    describe("when presence is not enabled", () => {
         itDoesOrderMembersCorrectly(false);
     });
 });
-

@@ -89,7 +89,7 @@ export default class ThreepidInviteStore extends EventEmitter {
     }
 
     public getInvites(): IThreepidInvite[] {
-        return this.getWireInvites().map(i => this.translateInvite(i));
+        return this.getWireInvites().map((i) => this.translateInvite(i));
     }
 
     // Currently Element can only handle one invite at a time, so handle that
@@ -97,7 +97,7 @@ export default class ThreepidInviteStore extends EventEmitter {
         return this.getInvites()[0];
     }
 
-    public resolveInvite(invite: IThreepidInvite) {
+    public resolveInvite(invite: IThreepidInvite): void {
         localStorage.removeItem(`${STORAGE_PREFIX}${invite.id}`);
     }
 

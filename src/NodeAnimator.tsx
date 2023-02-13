@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React from "react";
+import React, { ReactInstance } from "react";
 import ReactDom from "react-dom";
 
 interface IChildProps {
@@ -41,13 +41,13 @@ interface IProps {
  * automatic positional animation, look at react-shuffle or similar libraries.
  */
 export default class NodeAnimator extends React.Component<IProps> {
-    private nodes = {};
+    private nodes: Record<string, ReactInstance> = {};
     private children: { [key: string]: React.DetailedReactHTMLElement<any, HTMLElement> };
     public static defaultProps: Partial<IProps> = {
         startStyles: [],
     };
 
-    constructor(props: IProps) {
+    public constructor(props: IProps) {
         super(props);
 
         this.updateChildren(this.props.children);
@@ -65,7 +65,7 @@ export default class NodeAnimator extends React.Component<IProps> {
      */
     private applyStyles(node: HTMLElement, styles: React.CSSProperties): void {
         Object.entries(styles).forEach(([property, value]) => {
-            node.style[property] = value;
+            node.style[property as keyof Omit<CSSStyleDeclaration, "length" | "parentRule">] = value;
         });
     }
 
@@ -95,9 +95,7 @@ export default class NodeAnimator extends React.Component<IProps> {
                     newProps.style = startStyle;
                 }
 
-                newProps.ref = ((n) => this.collectNode(
-                    c.key, n, restingStyle,
-                ));
+                newProps.ref = (n) => this.collectNode(c.key, n, restingStyle);
 
                 this.children[c.key] = React.cloneElement(c, newProps);
             }
@@ -105,11 +103,7 @@ export default class NodeAnimator extends React.Component<IProps> {
     }
 
     private collectNode(k: string, node: React.ReactInstance, restingStyle: React.CSSProperties): void {
-        if (
-            node &&
-            this.nodes[k] === undefined &&
-            this.props.startStyles.length > 0
-        ) {
+        if (node && this.nodes[k] === undefined && this.props.startStyles.length > 0) {
             const startStyles = this.props.startStyles;
             const domNode = ReactDom.findDOMNode(node);
             // start from startStyle 1: 0 is the one we gave it
@@ -127,8 +121,6 @@ export default class NodeAnimator extends React.Component<IProps> {
     }
 
     public render(): JSX.Element {
-        return (
-            <>{ Object.values(this.children) }</>
-        );
+        return <>{Object.values(this.children)}</>;
     }
 }

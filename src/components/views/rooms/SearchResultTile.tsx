@@ -16,12 +16,11 @@ limitations under the License.
 */
 
 import React from "react";
-import { SearchResult } from "matrix-js-sdk/src/models/search-result";
 import { MatrixEvent } from "matrix-js-sdk/src/models/event";
 
 import RoomContext, { TimelineRenderingType } from "../../../contexts/RoomContext";
 import SettingsStore from "../../../settings/SettingsStore";
-import { RoomPermalinkCreator } from '../../../utils/permalinks/Permalinks';
+import { RoomPermalinkCreator } from "../../../utils/permalinks/Permalinks";
 import DateSeparator from "../messages/DateSeparator";
 import EventTile from "./EventTile";
 import { shouldFormContinuation } from "../../structures/MessagePanel";
@@ -30,36 +29,38 @@ import LegacyCallEventGrouper, { buildLegacyCallEventGroupers } from "../../stru
 import { haveRendererForEvent } from "../../../events/EventTileFactory";
 
 interface IProps {
-    // a matrix-js-sdk SearchResult containing the details of this result
-    searchResult: SearchResult;
     // a list of strings to be highlighted in the results
     searchHighlights?: string[];
     // href for the highlights in this result
     resultLink?: string;
+    // timeline of the search result
+    timeline: MatrixEvent[];
+    // indexes of the matching events (not contextual ones)
+    ourEventsIndexes: number[];
     onHeightChanged?: () => void;
     permalinkCreator?: RoomPermalinkCreator;
 }
 
 export default class SearchResultTile extends React.Component<IProps> {
-    static contextType = RoomContext;
+    public static contextType = RoomContext;
     public context!: React.ContextType<typeof RoomContext>;
 
     // A map of <callId, LegacyCallEventGrouper>
     private callEventGroupers = new Map<string, LegacyCallEventGrouper>();
 
-    constructor(props, context) {
+    public constructor(props: IProps, context: React.ContextType<typeof RoomContext>) {
         super(props, context);
 
-        this.buildLegacyCallEventGroupers(this.props.searchResult.context.getTimeline());
+        this.buildLegacyCallEventGroupers(this.props.timeline);
     }
 
     private buildLegacyCallEventGroupers(events?: MatrixEvent[]): void {
         this.callEventGroupers = buildLegacyCallEventGroupers(this.callEventGroupers, events);
     }
 
-    public render() {
-        const result = this.props.searchResult;
-        const resultEvent = result.context.getEvent();
+    public render(): JSX.Element {
+        const timeline = this.props.timeline;
+        const resultEvent = timeline[this.props.ourEventsIndexes[0]];
         const eventId = resultEvent.getId();
 
         const ts1 = resultEvent.getTs();
@@ -67,13 +68,12 @@ export default class SearchResultTile extends React.Component<IProps> {
         const layout = SettingsStore.getValue("layout");
         const isTwelveHour = SettingsStore.getValue("showTwelveHourTimestamps");
         const alwaysShowTimestamps = SettingsStore.getValue("alwaysShowTimestamps");
-        const threadsEnabled = SettingsStore.getValue("feature_thread");
+        const threadsEnabled = SettingsStore.getValue("feature_threadenabled");
 
-        const timeline = result.context.getTimeline();
         for (let j = 0; j < timeline.length; j++) {
             const mxEv = timeline[j];
             let highlights;
-            const contextual = (j != result.context.getOurEventIndex());
+            const contextual = !this.props.ourEventsIndexes.includes(j);
             if (!contextual) {
                 highlights = this.props.searchHighlights;
             }
@@ -82,8 +82,9 @@ export default class SearchResultTile extends React.Component<IProps> {
                 // do we need a date separator since the last event?
                 const prevEv = timeline[j - 1];
                 // is this a continuation of the previous message?
-                const continuation = prevEv &&
-                    !wantsDateSeparator(prevEv.getDate(), mxEv.getDate()) &&
+                const continuation =
+                    prevEv &&
+                    !wantsDateSeparator(prevEv.getDate() || undefined, mxEv.getDate() || undefined) &&
                     shouldFormContinuation(
                         prevEv,
                         mxEv,
@@ -95,8 +96,11 @@ export default class SearchResultTile extends React.Component<IProps> {
                 let lastInSection = true;
                 const nextEv = timeline[j + 1];
                 if (nextEv) {
-                    const willWantDateSeparator = wantsDateSeparator(mxEv.getDate(), nextEv.getDate());
-                    lastInSection = (
+                    const willWantDateSeparator = wantsDateSeparator(
+                        mxEv.getDate() || undefined,
+                        nextEv.getDate() || undefined,
+                    );
+                    lastInSection =
                         willWantDateSeparator ||
                         mxEv.getSender() !== nextEv.getSender() ||
                         !shouldFormContinuation(
@@ -105,8 +109,7 @@ export default class SearchResultTile extends React.Component<IProps> {
                             this.context?.showHiddenEvents,
                             threadsEnabled,
                             TimelineRenderingType.Search,
-                        )
-                    );
+                        );
                 }
 
                 ret.push(
@@ -129,8 +132,10 @@ export default class SearchResultTile extends React.Component<IProps> {
             }
         }
 
-        return <li data-scroll-tokens={eventId}>
-            <ol>{ ret }</ol>
-        </li>;
+        return (
+            <li data-scroll-tokens={eventId}>
+                <ol>{ret}</ol>
+            </li>
+        );
     }
 }

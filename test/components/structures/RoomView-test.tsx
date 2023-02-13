@@ -55,6 +55,7 @@ const RoomView = wrapInMatrixClientContext(_RoomView);
 describe("RoomView", () => {
     let cli: MockedObject<MatrixClient>;
     let room: Room;
+    let rooms: Map<string, Room>;
     let roomCount = 0;
     let stores: SdkContextClass;
 
@@ -64,8 +65,11 @@ describe("RoomView", () => {
         cli = mocked(MatrixClientPeg.get());
 
         room = new Room(`!${roomCount++}:example.org`, cli, "@alice:example.org");
+        jest.spyOn(room, "findPredecessor");
         room.getPendingEvents = () => [];
-        cli.getRoom.mockImplementation(() => room);
+        rooms = new Map();
+        rooms.set(room.roomId, room);
+        cli.getRoom.mockImplementation((roomId: string | undefined) => rooms.get(roomId || "") || null);
         // Re-emit certain events on the mocked client
         room.on(RoomEvent.Timeline, (...args) => cli.emit(RoomEvent.Timeline, ...args));
         room.on(RoomEvent.TimelineReset, (...args) => cli.emit(RoomEvent.TimelineReset, ...args));
@@ -75,7 +79,7 @@ describe("RoomView", () => {
         stores.client = cli;
         stores.rightPanelStore.useUnitTestClient(cli);
 
-        jest.spyOn(VoipUserMapper.sharedInstance(), 'getVirtualRoomForRoom').mockResolvedValue(null);
+        jest.spyOn(VoipUserMapper.sharedInstance(), "getVirtualRoomForRoom").mockResolvedValue(null);
     });
 
     afterEach(async () => {
@@ -85,7 +89,7 @@ describe("RoomView", () => {
 
     const mountRoomView = async (): Promise<ReactWrapper> => {
         if (stores.roomViewStore.getRoomId() !== room.roomId) {
-            const switchedRoom = new Promise<void>(resolve => {
+            const switchedRoom = new Promise<void>((resolve) => {
                 const subFn = () => {
                     if (stores.roomViewStore.getRoomId()) {
                         stores.roomViewStore.off(UPDATE_EVENT, subFn);
@@ -121,7 +125,7 @@ describe("RoomView", () => {
 
     const renderRoomView = async (): Promise<ReturnType<typeof render>> => {
         if (stores.roomViewStore.getRoomId() !== room.roomId) {
-            const switchedRoom = new Promise<void>(resolve => {
+            const switchedRoom = new Promise<void>((resolve) => {
                 const subFn = () => {
                     if (stores.roomViewStore.getRoomId()) {
                         stores.roomViewStore.off(UPDATE_EVENT, subFn);
@@ -158,6 +162,42 @@ describe("RoomView", () => {
     const getRoomViewInstance = async (): Promise<_RoomView> =>
         (await mountRoomView()).find(_RoomView).instance() as _RoomView;
 
+    it("when there is no room predecessor, getHiddenHighlightCount should return 0", async () => {
+        const instance = await getRoomViewInstance();
+        expect(instance.getHiddenHighlightCount()).toBe(0);
+    });
+
+    describe("when there is an old room", () => {
+        let instance: _RoomView;
+        let oldRoom: Room;
+
+        beforeEach(async () => {
+            instance = await getRoomViewInstance();
+            oldRoom = new Room("!old:example.com", cli, cli.getSafeUserId());
+            rooms.set(oldRoom.roomId, oldRoom);
+            jest.spyOn(room, "findPredecessor").mockReturnValue({ roomId: oldRoom.roomId, eventId: null });
+        });
+
+        it("and it has 0 unreads, getHiddenHighlightCount should return 0", async () => {
+            jest.spyOn(oldRoom, "getUnreadNotificationCount").mockReturnValue(0);
+            expect(instance.getHiddenHighlightCount()).toBe(0);
+            // assert that msc3946ProcessDynamicPredecessor is false by default
+            expect(room.findPredecessor).toHaveBeenCalledWith(false);
+        });
+
+        it("and it has 23 unreads, getHiddenHighlightCount should return 23", async () => {
+            jest.spyOn(oldRoom, "getUnreadNotificationCount").mockReturnValue(23);
+            expect(instance.getHiddenHighlightCount()).toBe(23);
+        });
+
+        it("and feature_dynamic_room_predecessors is enabled it should pass the setting to findPredecessor", async () => {
+            SettingsStore.setValue("feature_dynamic_room_predecessors", null, SettingLevel.DEVICE, true);
+            expect(instance.getHiddenHighlightCount()).toBe(0);
+            expect(room.findPredecessor).toHaveBeenCalledWith(true);
+            SettingsStore.setValue("feature_dynamic_room_predecessors", null, SettingLevel.DEVICE, null);
+        });
+    });
+
     it("updates url preview visibility on encryption state change", async () => {
         // we should be starting unencrypted
         expect(cli.isCryptoEnabled()).toEqual(false);
@@ -180,13 +220,15 @@ describe("RoomView", () => {
         cli.isRoomEncrypted.mockReturnValue(true);
 
         // and fake an encryption event into the room to prompt it to re-check
-        room.addLiveEvents([new MatrixEvent({
-            type: "m.room.encryption",
-            sender: cli.getUserId()!,
-            content: {},
-            event_id: "someid",
-            room_id: room.roomId,
-        })]);
+        room.addLiveEvents([
+            new MatrixEvent({
+                type: "m.room.encryption",
+                sender: cli.getUserId()!,
+                content: {},
+                event_id: "someid",
+                room_id: room.roomId,
+            }),
+        ]);
 
         // URL previews should now be disabled
         expect(roomViewInstance.state.showUrlPreview).toBe(false);
@@ -200,13 +242,13 @@ describe("RoomView", () => {
         expect(roomViewInstance.state.liveTimeline).not.toEqual(oldTimeline);
     });
 
-    describe('with virtual rooms', () => {
+    describe("with virtual rooms", () => {
         it("checks for a virtual room on initial load", async () => {
             const { container } = await renderRoomView();
             expect(VoipUserMapper.sharedInstance().getVirtualRoomForRoom).toHaveBeenCalledWith(room.roomId);
 
             // quick check that rendered without error
-            expect(container.querySelector('.mx_ErrorBoundary')).toBeFalsy();
+            expect(container.querySelector(".mx_ErrorBoundary")).toBeFalsy();
         });
 
         it("checks for a virtual room on room event", async () => {
@@ -246,6 +288,7 @@ describe("RoomView", () => {
 
         beforeEach(async () => {
             localRoom = room = await createDmLocalRoom(cli, [new DirectoryMember({ user_id: "@user:example.com" })]);
+            rooms.set(localRoom.roomId, localRoom);
             cli.store.storeRoom(room);
         });
 
@@ -307,7 +350,7 @@ describe("RoomView", () => {
             it("clicking retry should set the room state to new dispatch a local room event", async () => {
                 jest.spyOn(defaultDispatcher, "dispatch");
                 const { getByText } = await renderRoomView();
-                fireEvent.click(getByText('Retry'));
+                fireEvent.click(getByText("Retry"));
                 expect(localRoom.state).toBe(LocalRoomState.NEW);
                 expect(defaultDispatcher.dispatch).toHaveBeenCalledWith({
                     action: "local_room_event",

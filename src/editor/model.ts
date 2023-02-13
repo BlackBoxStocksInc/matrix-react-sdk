@@ -51,13 +51,13 @@ type ManualTransformCallback = () => Caret;
 export default class EditorModel {
     private _parts: Part[];
     private readonly _partCreator: PartCreator;
-    private activePartIdx: number = null;
-    private _autoComplete: AutocompleteWrapperModel = null;
-    private autoCompletePartIdx: number = null;
+    private activePartIdx: number | null = null;
+    private _autoComplete: AutocompleteWrapperModel | null = null;
+    private autoCompletePartIdx: number | null = null;
     private autoCompletePartCount = 0;
-    private transformCallback: TransformCallback = null;
+    private transformCallback: TransformCallback | null = null;
 
-    constructor(parts: Part[], partCreator: PartCreator, private updateCallback: UpdateCallback = null) {
+    public constructor(parts: Part[], partCreator: PartCreator, private updateCallback: UpdateCallback | null = null) {
         this._parts = parts;
         this._partCreator = partCreator;
         this.transformCallback = null;
@@ -91,7 +91,7 @@ export default class EditorModel {
     }
 
     public clone(): EditorModel {
-        const clonedParts = this.parts.map(p => this.partCreator.deserializePart(p.serialize()));
+        const clonedParts = this.parts.map((p) => this.partCreator.deserializePart(p.serialize()));
         return new EditorModel(clonedParts, this._partCreator, this.updateCallback);
     }
 
@@ -146,7 +146,7 @@ export default class EditorModel {
     }
 
     public serializeParts(): SerializedPart[] {
-        return this._parts.map(p => p.serialize());
+        return this._parts.map((p) => p.serialize());
     }
 
     private diff(newValue: string, inputType: string, caret: DocumentOffset): IDiff {
@@ -160,7 +160,7 @@ export default class EditorModel {
     }
 
     public reset(serializedParts: SerializedPart[], caret?: Caret, inputType?: string): void {
-        this._parts = serializedParts.map(p => this._partCreator.deserializePart(p));
+        this._parts = serializedParts.map((p) => this._partCreator.deserializePart(p));
         if (!caret) {
             caret = this.getPositionAtEnd();
         }
@@ -218,7 +218,7 @@ export default class EditorModel {
 
     private getTransformAddedLen(newPosition: DocumentPosition, inputType: string, diff: IDiff): number {
         const result = this.transformCallback(newPosition, inputType, diff);
-        return Number.isFinite(result) ? result as number : 0;
+        return Number.isFinite(result) ? (result as number) : 0;
     }
 
     private setActivePart(pos: DocumentPosition, canOpenAutoComplete: boolean): Promise<void> {
@@ -272,11 +272,11 @@ export default class EditorModel {
     };
 
     private mergeAdjacentParts(): void {
-        let prevPart;
+        let prevPart: Part | undefined;
         for (let i = 0; i < this._parts.length; ++i) {
             let part = this._parts[i];
             const isEmpty = !part.text.length;
-            const isMerged = !isEmpty && prevPart && prevPart.merge(part);
+            const isMerged = !isEmpty && prevPart && prevPart.merge?.(part);
             if (isEmpty || isMerged) {
                 // remove empty or merged part
                 part = prevPart;
@@ -397,11 +397,11 @@ export default class EditorModel {
 
     public positionForOffset(totalOffset: number, atPartEnd = false): DocumentPosition {
         let currentOffset = 0;
-        const index = this._parts.findIndex(part => {
+        const index = this._parts.findIndex((part) => {
             const partLen = part.text.length;
             if (
-                (atPartEnd && (currentOffset + partLen) >= totalOffset) ||
-                (!atPartEnd && (currentOffset + partLen) > totalOffset)
+                (atPartEnd && currentOffset + partLen >= totalOffset) ||
+                (!atPartEnd && currentOffset + partLen > totalOffset)
             ) {
                 return true;
             }

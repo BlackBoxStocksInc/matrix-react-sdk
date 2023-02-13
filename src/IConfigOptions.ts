@@ -57,7 +57,7 @@ export interface IConfigOptions {
     branding?: {
         welcome_background_url?: string | string[]; // chosen at random if array
         auth_header_logo_url?: string;
-        auth_footer_links?: {text: string, url: string}[];
+        auth_footer_links?: { text: string; url: string }[];
     };
 
     map_style_url?: string; // for location-shared maps
@@ -99,7 +99,7 @@ export interface IConfigOptions {
     features?: Record<string, boolean>; // <FeatureName, EnabledBool>
 
     bug_report_endpoint_url?: string; // omission disables bug reporting
-    uisi_autorageshake_app?: string;
+    uisi_autorageshake_app?: string; // defaults to "element-auto-uisi"
     sentry?: {
         dsn: string;
         environment?: string; // "production", etc
@@ -163,16 +163,24 @@ export interface IConfigOptions {
 
     enable_presence_by_hs_url?: Record<string, boolean>; // <HomeserverName, Enabled>
 
-    terms_and_conditions_links?: { url: string, text: string }[];
+    terms_and_conditions_links?: { url: string; text: string }[];
 
     latex_maths_delims?: {
         inline?: {
             left?: string;
             right?: string;
+            pattern?: {
+                tex?: string;
+                latex?: string;
+            };
         };
         display?: {
             left?: string;
             right?: string;
+            pattern?: {
+                tex?: string;
+                latex?: string;
+            };
         };
     };
 

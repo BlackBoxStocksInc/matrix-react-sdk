@@ -44,7 +44,7 @@ interface IClickableProps extends IProps, React.InputHTMLAttributes<Element> {
     /**
      * If specified will return an AccessibleButton instead of a div.
      */
-    onClick?(ev: React.MouseEvent);
+    onClick?(ev: React.MouseEvent): void;
 }
 
 interface IState {
@@ -55,7 +55,7 @@ interface IState {
 export default class NotificationBadge extends React.PureComponent<XOR<IProps, IClickableProps>, IState> {
     private countWatcherRef: string;
 
-    constructor(props: IProps) {
+    public constructor(props: IProps) {
         super(props);
         this.props.notification.on(NotificationStateEvents.Update, this.onNotificationUpdate);
 
@@ -65,7 +65,8 @@ export default class NotificationBadge extends React.PureComponent<XOR<IProps, I
         };
 
         this.countWatcherRef = SettingsStore.watchSetting(
-            "Notifications.alwaysShowBadgeCounts", this.roomId,
+            "Notifications.alwaysShowBadgeCounts",
+            this.roomId,
             this.countPreferenceChanged,
         );
     }
@@ -75,12 +76,12 @@ export default class NotificationBadge extends React.PureComponent<XOR<IProps, I
         return this.props.roomId || null;
     }
 
-    public componentWillUnmount() {
+    public componentWillUnmount(): void {
         SettingsStore.unwatchSetting(this.countWatcherRef);
         this.props.notification.off(NotificationStateEvents.Update, this.onNotificationUpdate);
     }
 
-    public componentDidUpdate(prevProps: Readonly<IProps>) {
+    public componentDidUpdate(prevProps: Readonly<IProps>): void {
         if (prevProps.notification) {
             prevProps.notification.off(NotificationStateEvents.Update, this.onNotificationUpdate);
         }
@@ -88,22 +89,22 @@ export default class NotificationBadge extends React.PureComponent<XOR<IProps, I
         this.props.notification.on(NotificationStateEvents.Update, this.onNotificationUpdate);
     }
 
-    private countPreferenceChanged = () => {
+    private countPreferenceChanged = (): void => {
         this.setState({ showCounts: SettingsStore.getValue("Notifications.alwaysShowBadgeCounts", this.roomId) });
     };
 
-    private onNotificationUpdate = () => {
+    private onNotificationUpdate = (): void => {
         this.forceUpdate(); // notification state changed - update
     };
 
-    private onMouseOver = (e: MouseEvent) => {
+    private onMouseOver = (e: MouseEvent): void => {
         e.stopPropagation();
         this.setState({
             showTooltip: true,
         });
     };
 
-    private onMouseLeave = () => {
+    private onMouseLeave = (): void => {
         this.setState({
             showTooltip: false,
         });
@@ -125,16 +126,18 @@ export default class NotificationBadge extends React.PureComponent<XOR<IProps, I
             tooltip = <Tooltip className="mx_RoleButton_tooltip" label={label} />;
         }
 
-        return <StatelessNotificationBadge
-            label={label}
-            symbol={notification.symbol}
-            count={notification.count}
-            color={notification.color}
-            onClick={onClick}
-            onMouseOver={this.onMouseOver}
-            onMouseLeave={this.onMouseLeave}
-        >
-            { tooltip }
-        </StatelessNotificationBadge>;
+        return (
+            <StatelessNotificationBadge
+                label={label}
+                symbol={notification.symbol}
+                count={notification.count}
+                color={notification.color}
+                onClick={onClick}
+                onMouseOver={this.onMouseOver}
+                onMouseLeave={this.onMouseLeave}
+            >
+                {tooltip}
+            </StatelessNotificationBadge>
+        );
     }
 }

@@ -16,6 +16,7 @@ limitations under the License.
 
 // eslint-disable-next-line deprecate/import
 import { mount } from "enzyme";
+import { MatrixClient } from "matrix-js-sdk/src/matrix";
 import { sleep } from "matrix-js-sdk/src/utils";
 import React from "react";
 import { act } from "react-dom/test-utils";
@@ -24,26 +25,20 @@ import { useUserDirectory } from "../../src/hooks/useUserDirectory";
 import { MatrixClientPeg } from "../../src/MatrixClientPeg";
 import { stubClient } from "../test-utils";
 
-function UserDirectoryComponent({ onClick }) {
+function UserDirectoryComponent({ onClick }: { onClick(hook: ReturnType<typeof useUserDirectory>): void }) {
     const userDirectory = useUserDirectory();
 
-    const {
-        ready,
-        loading,
-        users,
-    } = userDirectory;
+    const { ready, loading, users } = userDirectory;
 
-    return <div onClick={() => onClick(userDirectory)}>
-        { users[0]
-            ? (
-                `Name: ${users[0].name}`
-            )
-            : `ready: ${ready}, loading: ${loading}` }
-    </div>;
+    return (
+        <div onClick={() => onClick(userDirectory)}>
+            {users[0] ? `Name: ${users[0].name}` : `ready: ${ready}, loading: ${loading}`}
+        </div>
+    );
 }
 
 describe("useUserDirectory", () => {
-    let cli;
+    let cli: MatrixClient;
 
     beforeEach(() => {
         stubClient();
@@ -51,23 +46,31 @@ describe("useUserDirectory", () => {
 
         MatrixClientPeg.getHomeserverName = () => "matrix.org";
         cli.getThirdpartyProtocols = () => Promise.resolve({});
-        cli.searchUserDirectory = (({ term: query }) => Promise.resolve({
-            results: [{
-                user_id: "@bob:matrix.org",
-                display_name: query,
-            }] },
-        ));
+        cli.searchUserDirectory = ({ term: query }) =>
+            Promise.resolve({
+                results: [
+                    {
+                        user_id: "@bob:matrix.org",
+                        display_name: query,
+                    },
+                ],
+                limited: false,
+            });
     });
 
     it("search for users in the identity server", async () => {
         const query = "Bob";
 
-        const wrapper = mount(<UserDirectoryComponent onClick={(hook) => {
-            hook.search({
-                limit: 1,
-                query,
-            });
-        }} />);
+        const wrapper = mount(
+            <UserDirectoryComponent
+                onClick={(hook) => {
+                    hook.search({
+                        limit: 1,
+                        query,
+                    });
+                }}
+            />,
+        );
 
         expect(wrapper.text()).toBe("ready: true, loading: false");
 
@@ -83,12 +86,16 @@ describe("useUserDirectory", () => {
     it("should work with empty queries", async () => {
         const query = "";
 
-        const wrapper = mount(<UserDirectoryComponent onClick={(hook) => {
-            hook.search({
-                limit: 1,
-                query,
-            });
-        }} />);
+        const wrapper = mount(
+            <UserDirectoryComponent
+                onClick={(hook) => {
+                    hook.search({
+                        limit: 1,
+                        query,
+                    });
+                }}
+            />,
+        );
         await act(async () => {
             await sleep(1);
             wrapper.simulate("click");
@@ -98,15 +105,21 @@ describe("useUserDirectory", () => {
     });
 
     it("should recover from a server exception", async () => {
-        cli.searchUserDirectory = () => { throw new Error("Oops"); };
+        cli.searchUserDirectory = () => {
+            throw new Error("Oops");
+        };
         const query = "Bob";
 
-        const wrapper = mount(<UserDirectoryComponent onClick={(hook) => {
-            hook.search({
-                limit: 1,
-                query,
-            });
-        }} />);
+        const wrapper = mount(
+            <UserDirectoryComponent
+                onClick={(hook) => {
+                    hook.search({
+                        limit: 1,
+                        query,
+                    });
+                }}
+            />,
+        );
         await act(async () => {
             await sleep(1);
             wrapper.simulate("click");

@@ -13,7 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { mocked } from 'jest-mock';
+
+import { mocked } from "jest-mock";
+import { Room } from "matrix-js-sdk/src/models/room";
 
 import { SpaceWatcher } from "../../../src/stores/room-list/SpaceWatcher";
 import type { RoomListStoreClass } from "../../../src/stores/room-list/RoomListStore";
@@ -22,11 +24,7 @@ import SpaceStore from "../../../src/stores/spaces/SpaceStore";
 import { MetaSpace, UPDATE_HOME_BEHAVIOUR } from "../../../src/stores/spaces";
 import { stubClient } from "../../test-utils";
 import { SettingLevel } from "../../../src/settings/SettingLevel";
-import {
-    mkSpace,
-    emitPromise,
-    setupAsyncStoreWithClient,
-} from "../../test-utils";
+import { mkSpace, emitPromise, setupAsyncStoreWithClient } from "../../test-utils";
 import { MatrixClientPeg } from "../../../src/MatrixClientPeg";
 import { SpaceFilterCondition } from "../../../src/stores/room-list/filters/SpaceFilterCondition";
 import DMRoomMap from "../../../src/utils/DMRoomMap";
@@ -34,8 +32,8 @@ import DMRoomMap from "../../../src/utils/DMRoomMap";
 let filter: SpaceFilterCondition = null;
 
 const mockRoomListStore = {
-    addFilter: f => filter = f,
-    removeFilter: () => filter = null,
+    addFilter: (f: SpaceFilterCondition) => (filter = f),
+    removeFilter: (): void => (filter = null),
 } as unknown as RoomListStoreClass;
 
 const getUserIdForRoomId = jest.fn();
@@ -51,7 +49,7 @@ describe("SpaceWatcher", () => {
     const store = SpaceStore.instance;
     const client = mocked(MatrixClientPeg.get());
 
-    let rooms = [];
+    let rooms: Room[] = [];
     const mkSpaceForRooms = (spaceId: string, children: string[] = []) => mkSpace(client, spaceId, rooms, children);
 
     const setShowAllRooms = async (value: boolean) => {
@@ -64,7 +62,7 @@ describe("SpaceWatcher", () => {
         filter = null;
         store.removeAllListeners();
         store.setActiveSpace(MetaSpace.Home);
-        client.getVisibleRooms.mockReturnValue(rooms = []);
+        client.getVisibleRooms.mockReturnValue((rooms = []));
 
         mkSpaceForRooms(space1);
         mkSpaceForRooms(space2);
@@ -76,7 +74,7 @@ describe("SpaceWatcher", () => {
             [MetaSpace.Orphans]: true,
         });
 
-        client.getRoom.mockImplementation(roomId => rooms.find(room => room.roomId === roomId));
+        client.getRoom.mockImplementation((roomId) => rooms.find((room) => room.roomId === roomId));
         await setupAsyncStoreWithClient(store, client);
     });
 

@@ -22,24 +22,22 @@ import { act } from "react-dom/test-utils";
 
 import { useLatestResult } from "../../src/hooks/useLatestResult";
 
-function LatestResultsComponent({ query, doRequest }) {
+function LatestResultsComponent({ query, doRequest }: { query: number; doRequest(query: number): Promise<number> }) {
     const [value, setValueInternal] = useState<number>(0);
     const [updateQuery, updateResult] = useLatestResult(setValueInternal);
     useEffect(() => {
         updateQuery(query);
-        doRequest(query).then(it => {
+        doRequest(query).then((it: number) => {
             updateResult(query, it);
         });
     }, [doRequest, query, updateQuery, updateResult]);
 
-    return <div>
-        { value }
-    </div>;
+    return <div>{value}</div>;
 }
 
 describe("useLatestResult", () => {
     it("should return results", async () => {
-        const doRequest = async (query) => {
+        const doRequest = async (query: number) => {
             await sleep(180);
             return query;
         };
@@ -65,7 +63,7 @@ describe("useLatestResult", () => {
     });
 
     it("should prevent out-of-order results", async () => {
-        const doRequest = async (query) => {
+        const doRequest = async (query: number) => {
             await sleep(query);
             return query;
         };

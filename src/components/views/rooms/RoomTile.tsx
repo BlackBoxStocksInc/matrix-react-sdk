@@ -22,10 +22,10 @@ import classNames from "classnames";
 import type { Call } from "../../../models/Call";
 import { RovingTabIndexWrapper } from "../../../accessibility/RovingTabIndex";
 import AccessibleButton, { ButtonEvent } from "../../views/elements/AccessibleButton";
-import defaultDispatcher from '../../../dispatcher/dispatcher';
+import defaultDispatcher from "../../../dispatcher/dispatcher";
 import { Action } from "../../../dispatcher/actions";
 import { _t } from "../../../languageHandler";
-import { ChevronFace, ContextMenuTooltipButton } from "../../structures/ContextMenu";
+import { ChevronFace, ContextMenuTooltipButton, MenuProps } from "../../structures/ContextMenu";
 import { DefaultTagID, TagID } from "../../../stores/room-list/models";
 import { MessagePreviewStore } from "../../../stores/room-list/MessagePreviewStore";
 import DecoratedRoomAvatar from "../avatars/DecoratedRoomAvatar";
@@ -71,9 +71,9 @@ interface State {
     messagePreview?: string;
 }
 
-const messagePreviewId = (roomId: string) => `mx_RoomTile_messagePreview_${roomId}`;
+const messagePreviewId = (roomId: string): string => `mx_RoomTile_messagePreview_${roomId}`;
 
-export const contextMenuBelow = (elementRect: PartialDOMRect) => {
+export const contextMenuBelow = (elementRect: PartialDOMRect): MenuProps => {
     // align the context menu's icons with the icon which opened the context menu
     const left = elementRect.left + window.scrollX - 9;
     const top = elementRect.bottom + window.scrollY + 17;
@@ -87,7 +87,7 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
     private notificationState: NotificationState;
     private roomProps: RoomEchoChamber;
 
-    constructor(props: ClassProps) {
+    public constructor(props: ClassProps) {
         super(props);
 
         this.state = {
@@ -104,15 +104,15 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         this.roomProps = EchoChamber.forRoom(this.props.room);
     }
 
-    private onRoomNameUpdate = (room: Room) => {
+    private onRoomNameUpdate = (room: Room): void => {
         this.forceUpdate();
     };
 
-    private onNotificationUpdate = () => {
+    private onNotificationUpdate = (): void => {
         this.forceUpdate(); // notification state changed - update
     };
 
-    private onRoomPropertyUpdate = (property: CachedRoomKey) => {
+    private onRoomPropertyUpdate = (property: CachedRoomKey): void => {
         if (property === CachedRoomKey.NotificationVolume) this.onNotificationUpdate();
         // else ignore - not important for this tile
     };
@@ -125,7 +125,7 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         return !this.props.isMinimized && this.props.showMessagePreview;
     }
 
-    public componentDidUpdate(prevProps: Readonly<Props>, prevState: Readonly<State>) {
+    public componentDidUpdate(prevProps: Readonly<Props>, prevState: Readonly<State>): void {
         const showMessageChanged = prevProps.showMessagePreview !== this.props.showMessagePreview;
         const minimizedChanged = prevProps.isMinimized !== this.props.isMinimized;
         if (showMessageChanged || minimizedChanged) {
@@ -145,7 +145,7 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         }
     }
 
-    public componentDidMount() {
+    public componentDidMount(): void {
         // when we're first rendered (or our sublist is expanded) make sure we are visible if we're active
         if (this.state.selected) {
             this.scrollIntoView();
@@ -167,7 +167,7 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         this.setState({ call: CallStore.instance.getCall(this.props.room.roomId) });
     }
 
-    public componentWillUnmount() {
+    public componentWillUnmount(): void {
         SdkContextClass.instance.roomViewStore.removeRoomListener(this.props.room.roomId, this.onActiveRoomUpdate);
         MessagePreviewStore.instance.off(
             MessagePreviewStore.getPreviewChangedEventName(this.props.room),
@@ -180,8 +180,9 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         CallStore.instance.off(CallStoreEvent.Call, this.onCallChanged);
     }
 
-    private onAction = (payload: ActionPayload) => {
-        if (payload.action === Action.ViewRoom &&
+    private onAction = (payload: ActionPayload): void => {
+        if (
+            payload.action === Action.ViewRoom &&
             payload.room_id === this.props.room.roomId &&
             payload.show_room_tile
         ) {
@@ -191,17 +192,17 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         }
     };
 
-    private onRoomPreviewChanged = (room: Room) => {
+    private onRoomPreviewChanged = (room: Room): void => {
         if (this.props.room && room.roomId === this.props.room.roomId) {
             this.generatePreview();
         }
     };
 
-    private onCallChanged = (call: Call, roomId: string) => {
+    private onCallChanged = (call: Call, roomId: string): void => {
         if (roomId === this.props.room?.roomId) this.setState({ call });
     };
 
-    private async generatePreview() {
+    private async generatePreview(): Promise<void> {
         if (!this.showMessagePreview) {
             return null;
         }
@@ -210,7 +211,7 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         this.setState({ messagePreview });
     }
 
-    private scrollIntoView = () => {
+    private scrollIntoView = (): void => {
         if (!this.roomTileRef.current) return;
         this.roomTileRef.current.scrollIntoView({
             block: "nearest",
@@ -218,13 +219,14 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         });
     };
 
-    private onTileClick = async (ev: React.KeyboardEvent) => {
+    private onTileClick = async (ev: React.KeyboardEvent): Promise<void> => {
         ev.preventDefault();
         ev.stopPropagation();
 
         const action = getKeyBindingsManager().getAccessibilityAction(ev);
-        const clearSearch = ([KeyBindingAction.Enter, KeyBindingAction.Space] as Array<string | undefined>)
-            .includes(action);
+        const clearSearch = ([KeyBindingAction.Enter, KeyBindingAction.Space] as Array<string | undefined>).includes(
+            action,
+        );
 
         defaultDispatcher.dispatch<ViewRoomPayload>({
             action: Action.ViewRoom,
@@ -236,11 +238,11 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         });
     };
 
-    private onActiveRoomUpdate = (isActive: boolean) => {
+    private onActiveRoomUpdate = (isActive: boolean): void => {
         this.setState({ selected: isActive });
     };
 
-    private onNotificationsMenuOpenClick = (ev: ButtonEvent) => {
+    private onNotificationsMenuOpenClick = (ev: ButtonEvent): void => {
         ev.preventDefault();
         ev.stopPropagation();
         const target = ev.target as HTMLButtonElement;
@@ -249,18 +251,18 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         PosthogTrackers.trackInteraction("WebRoomListRoomTileNotificationsMenu", ev);
     };
 
-    private onCloseNotificationsMenu = () => {
+    private onCloseNotificationsMenu = (): void => {
         this.setState({ notificationsMenuPosition: null });
     };
 
-    private onGeneralMenuOpenClick = (ev: ButtonEvent) => {
+    private onGeneralMenuOpenClick = (ev: ButtonEvent): void => {
         ev.preventDefault();
         ev.stopPropagation();
         const target = ev.target as HTMLButtonElement;
         this.setState({ generalMenuPosition: target.getBoundingClientRect() });
     };
 
-    private onContextMenu = (ev: React.MouseEvent) => {
+    private onContextMenu = (ev: React.MouseEvent): void => {
         // If we don't have a context menu to show, ignore the action.
         if (!this.showContextMenu) return;
 
@@ -274,13 +276,16 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         });
     };
 
-    private onCloseGeneralMenu = () => {
+    private onCloseGeneralMenu = (): void => {
         this.setState({ generalMenuPosition: null });
     };
 
     private renderNotificationsMenu(isActive: boolean): React.ReactElement | null {
-        if (MatrixClientPeg.get().isGuest() || this.props.tag === DefaultTagID.Archived ||
-            !this.showContextMenu || this.props.isMinimized
+        if (
+            MatrixClientPeg.get().isGuest() ||
+            this.props.tag === DefaultTagID.Archived ||
+            !this.showContextMenu ||
+            this.props.isMinimized
         ) {
             // the menu makes no sense in these cases so do not show one
             return null;
@@ -309,13 +314,13 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
                     isExpanded={!!this.state.notificationsMenuPosition}
                     tabIndex={isActive ? 0 : -1}
                 />
-                { this.state.notificationsMenuPosition && (
+                {this.state.notificationsMenuPosition && (
                     <RoomNotificationContextMenu
                         {...contextMenuBelow(this.state.notificationsMenuPosition)}
                         onFinished={this.onCloseNotificationsMenu}
                         room={this.props.room}
                     />
-                ) }
+                )}
             </React.Fragment>
         );
     }
@@ -330,39 +335,39 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
                     title={_t("Room options")}
                     isExpanded={!!this.state.generalMenuPosition}
                 />
-                { this.state.generalMenuPosition && (
+                {this.state.generalMenuPosition && (
                     <RoomGeneralContextMenu
                         {...contextMenuBelow(this.state.generalMenuPosition)}
                         onFinished={this.onCloseGeneralMenu}
                         room={this.props.room}
-                        onPostFavoriteClick={(ev: ButtonEvent) => PosthogTrackers.trackInteraction(
-                            "WebRoomListRoomTileContextMenuFavouriteToggle", ev,
-                        )}
-                        onPostInviteClick={(ev: ButtonEvent) => PosthogTrackers.trackInteraction(
-                            "WebRoomListRoomTileContextMenuInviteItem", ev,
-                        )}
-                        onPostSettingsClick={(ev: ButtonEvent) => PosthogTrackers.trackInteraction(
-                            "WebRoomListRoomTileContextMenuSettingsItem", ev,
-                        )}
-                        onPostLeaveClick={(ev: ButtonEvent) => PosthogTrackers.trackInteraction(
-                            "WebRoomListRoomTileContextMenuLeaveItem", ev,
-                        )}
+                        onPostFavoriteClick={(ev: ButtonEvent) =>
+                            PosthogTrackers.trackInteraction("WebRoomListRoomTileContextMenuFavouriteToggle", ev)
+                        }
+                        onPostInviteClick={(ev: ButtonEvent) =>
+                            PosthogTrackers.trackInteraction("WebRoomListRoomTileContextMenuInviteItem", ev)
+                        }
+                        onPostSettingsClick={(ev: ButtonEvent) =>
+                            PosthogTrackers.trackInteraction("WebRoomListRoomTileContextMenuSettingsItem", ev)
+                        }
+                        onPostLeaveClick={(ev: ButtonEvent) =>
+                            PosthogTrackers.trackInteraction("WebRoomListRoomTileContextMenuLeaveItem", ev)
+                        }
                     />
-                ) }
+                )}
             </React.Fragment>
         );
     }
 
     public render(): React.ReactElement {
         const classes = classNames({
-            'mx_RoomTile': true,
-            'mx_RoomTile_selected': this.state.selected,
-            'mx_RoomTile_hasMenuOpen': !!(this.state.generalMenuPosition || this.state.notificationsMenuPosition),
-            'mx_RoomTile_minimized': this.props.isMinimized,
+            mx_RoomTile: true,
+            mx_RoomTile_selected: this.state.selected,
+            mx_RoomTile_hasMenuOpen: !!(this.state.generalMenuPosition || this.state.notificationsMenuPosition),
+            mx_RoomTile_minimized: this.props.isMinimized,
         });
 
         let name = this.props.room.name;
-        if (typeof name !== 'string') name = '';
+        if (typeof name !== "string") name = "";
         name = name.replace(":", ":\u200b"); // add a zero-width space to allow linewrapping after the colon
 
         let badge: React.ReactNode;
@@ -395,25 +400,23 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
                     id={messagePreviewId(this.props.room.roomId)}
                     title={this.state.messagePreview}
                 >
-                    { this.state.messagePreview }
+                    {this.state.messagePreview}
                 </div>
             );
         }
 
         const titleClasses = classNames({
-            "mx_RoomTile_title": true,
-            "mx_RoomTile_titleWithSubtitle": !!subtitle,
-            "mx_RoomTile_titleHasUnreadEvents": this.notificationState.isUnread,
+            mx_RoomTile_title: true,
+            mx_RoomTile_titleWithSubtitle: !!subtitle,
+            mx_RoomTile_titleHasUnreadEvents: this.notificationState.isUnread,
         });
 
         const titleContainer = this.props.isMinimized ? null : (
             <div className="mx_RoomTile_titleContainer">
                 <div title={name} className={titleClasses} tabIndex={-1}>
-                    <span dir="auto">
-                        { name }
-                    </span>
+                    <span dir="auto">{name}</span>
                 </div>
-                { subtitle }
+                {subtitle}
             </div>
         );
 
@@ -422,13 +425,17 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         if (this.props.tag === DefaultTagID.Invite) {
             // append nothing
         } else if (this.notificationState.hasMentions) {
-            ariaLabel += " " + _t("%(count)s unread messages including mentions.", {
-                count: this.notificationState.count,
-            });
+            ariaLabel +=
+                " " +
+                _t("%(count)s unread messages including mentions.", {
+                    count: this.notificationState.count,
+                });
         } else if (this.notificationState.hasUnreadCount) {
-            ariaLabel += " " + _t("%(count)s unread messages.", {
-                count: this.notificationState.count,
-            });
+            ariaLabel +=
+                " " +
+                _t("%(count)s unread messages.", {
+                    count: this.notificationState.count,
+                });
         } else if (this.notificationState.isUnread) {
             ariaLabel += " " + _t("Unread messages.");
         }
@@ -450,7 +457,7 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
         return (
             <React.Fragment>
                 <RovingTabIndexWrapper inputRef={this.roomTileRef}>
-                    { ({ onFocus, isActive, ref }) =>
+                    {({ onFocus, isActive, ref }) => (
                         <Button
                             {...props}
                             onFocus={onFocus}
@@ -470,12 +477,12 @@ export class RoomTile extends React.PureComponent<ClassProps, State> {
                                 displayBadge={this.props.isMinimized}
                                 tooltipProps={{ tabIndex: isActive ? 0 : -1 }}
                             />
-                            { titleContainer }
-                            { badge }
-                            { this.renderGeneralMenu() }
-                            { this.renderNotificationsMenu(isActive) }
+                            {titleContainer}
+                            {badge}
+                            {this.renderGeneralMenu()}
+                            {this.renderNotificationsMenu(isActive)}
                         </Button>
-                    }
+                    )}
                 </RovingTabIndexWrapper>
             </React.Fragment>
         );

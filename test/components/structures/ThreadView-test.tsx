@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import ThreadView from "../../../src/components/structures/ThreadView";
 import MatrixClientContext from "../../../src/contexts/MatrixClientContext";
 import RoomContext from "../../../src/contexts/RoomContext";
 import { SdkContextClass } from "../../../src/contexts/SDKContext";
+import { Action } from "../../../src/dispatcher/actions";
+import dispatcher from "../../../src/dispatcher/dispatcher";
 import { MatrixClientPeg } from "../../../src/MatrixClientPeg";
 import DMRoomMap from "../../../src/utils/DMRoomMap";
 import ResizeNotifier from "../../../src/utils/ResizeNotifier";
@@ -47,37 +49,41 @@ describe("ThreadView", () => {
 
     let changeEvent: (event: MatrixEvent) => void;
 
-    function TestThreadView() {
+    function TestThreadView({ initialEvent }: { initialEvent?: MatrixEvent }) {
         const [event, setEvent] = useState(rootEvent);
         changeEvent = setEvent;
 
-        return <MatrixClientContext.Provider value={mockClient}>
-            <RoomContext.Provider value={getRoomContext(room, {
-                canSendMessages: true,
-            })}>
-                <ThreadView
-                    room={room}
-                    onClose={jest.fn()}
-                    mxEvent={event}
-                    resizeNotifier={new ResizeNotifier()}
-                />
-            </RoomContext.Provider>,
-        </MatrixClientContext.Provider>;
+        return (
+            <MatrixClientContext.Provider value={mockClient}>
+                <RoomContext.Provider
+                    value={getRoomContext(room, {
+                        canSendMessages: true,
+                    })}
+                >
+                    <ThreadView
+                        room={room}
+                        onClose={jest.fn()}
+                        mxEvent={event}
+                        initialEvent={initialEvent}
+                        resizeNotifier={new ResizeNotifier()}
+                    />
+                </RoomContext.Provider>
+                ,
+            </MatrixClientContext.Provider>
+        );
     }
 
-    async function getComponent(): Promise<RenderResult> {
-        const renderResult = render(
-            <TestThreadView />,
-        );
+    async function getComponent(initialEvent?: MatrixEvent): Promise<RenderResult> {
+        const renderResult = render(<TestThreadView initialEvent={initialEvent} />);
 
         await waitFor(() => {
-            expect(() => getByTestId(renderResult.container, 'spinner')).toThrow();
+            expect(() => getByTestId(renderResult.container, "spinner")).toThrow();
         });
 
         return renderResult;
     }
 
-    async function sendMessage(container, text): Promise<void> {
+    async function sendMessage(container: HTMLElement, text: string): Promise<void> {
         const composer = getByTestId(container, "basicmessagecomposer");
         await userEvent.click(composer);
         await userEvent.keyboard(text);
@@ -85,16 +91,19 @@ describe("ThreadView", () => {
         await userEvent.click(sendMessageBtn);
     }
 
-    function expectedMessageBody(rootEvent, message) {
+    function expectedMessageBody(rootEvent: MatrixEvent, message: string) {
         return {
             "body": message,
             "m.relates_to": {
                 "event_id": rootEvent.getId(),
                 "is_falling_back": true,
                 "m.in_reply_to": {
-                    "event_id": rootEvent.getThread().lastReply((ev: MatrixEvent) => {
-                        return ev.isRelation(THREAD_RELATION_TYPE.name);
-                    }).getId(),
+                    event_id: rootEvent
+                        .getThread()
+                        .lastReply((ev: MatrixEvent) => {
+                            return ev.isRelation(THREAD_RELATION_TYPE.name);
+                        })
+                        .getId(),
                 },
                 "rel_type": RelationType.Thread,
             },
@@ -108,7 +117,7 @@ describe("ThreadView", () => {
         stubClient();
         mockPlatformPeg();
         mockClient = mocked(MatrixClientPeg.get());
-        jest.spyOn(mockClient, "supportsExperimentalThreads").mockReturnValue(true);
+        jest.spyOn(mockClient, "supportsThreads").mockReturnValue(true);
 
         room = new Room(ROOM_ID, mockClient, mockClient.getUserId() ?? "", {
             pendingEventOrdering: PendingEventOrdering.Detached,
@@ -133,7 +142,9 @@ describe("ThreadView", () => {
         await sendMessage(container, "Hello world!");
 
         expect(mockClient.sendMessage).toHaveBeenCalledWith(
-            ROOM_ID, rootEvent.getId(), expectedMessageBody(rootEvent, "Hello world!"),
+            ROOM_ID,
+            rootEvent.getId(),
+            expectedMessageBody(rootEvent, "Hello world!"),
         );
     });
 
@@ -154,7 +165,9 @@ describe("ThreadView", () => {
         await sendMessage(container, "yolo");
 
         expect(mockClient.sendMessage).toHaveBeenCalledWith(
-            ROOM_ID, rootEvent2.getId(), expectedMessageBody(rootEvent2, "yolo"),
+            ROOM_ID,
+            rootEvent2.getId(),
+            expectedMessageBody(rootEvent2, "yolo"),
         );
     });
 
@@ -165,5 +178,18 @@ describe("ThreadView", () => {
 
         unmount();
         await waitFor(() => expect(SdkContextClass.instance.roomViewStore.getThreadId()).toBeNull());
+    });
+
+    it("clears highlight message in the room view store", async () => {
+        jest.spyOn(SdkContextClass.instance.roomViewStore, "getRoomId").mockReturnValue(room.roomId);
+        const mock = jest.spyOn(dispatcher, "dispatch");
+        const { unmount } = await getComponent(rootEvent);
+        mock.mockClear();
+        unmount();
+        expect(mock).toHaveBeenCalledWith({
+            action: Action.ViewRoom,
+            room_id: room.roomId,
+            metricsTrigger: undefined,
+        });
     });
 });

@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SlidingSync } from 'matrix-js-sdk/src/sliding-sync';
-import { mocked } from 'jest-mock';
-import { MatrixClient, MatrixEvent, Room } from 'matrix-js-sdk/src/matrix';
+import { SlidingSync } from "matrix-js-sdk/src/sliding-sync";
+import { mocked } from "jest-mock";
+import { MatrixClient, MatrixEvent, Room } from "matrix-js-sdk/src/matrix";
 
-import { SlidingSyncManager } from '../src/SlidingSyncManager';
-import { stubClient } from './test-utils';
+import { SlidingSyncManager } from "../src/SlidingSyncManager";
+import { stubClient } from "./test-utils";
 
-jest.mock('matrix-js-sdk/src/sliding-sync');
-const MockSlidingSync = <jest.Mock<SlidingSync>><unknown>SlidingSync;
+jest.mock("matrix-js-sdk/src/sliding-sync");
+const MockSlidingSync = <jest.Mock<SlidingSync>>(<unknown>SlidingSync);
 
-describe('SlidingSyncManager', () => {
+describe("SlidingSyncManager", () => {
     let manager: SlidingSyncManager;
     let slidingSync: SlidingSync;
     let client: MatrixClient;
@@ -78,13 +78,76 @@ describe('SlidingSyncManager', () => {
         });
     });
 
+    describe("ensureListRegistered", () => {
+        it("creates a new list based on the key", async () => {
+            const listKey = "key";
+            mocked(slidingSync.getListParams).mockReturnValue(null);
+            mocked(slidingSync.setList).mockResolvedValue("yep");
+            await manager.ensureListRegistered(listKey, {
+                sort: ["by_recency"],
+            });
+            expect(slidingSync.setList).toBeCalledWith(
+                listKey,
+                expect.objectContaining({
+                    sort: ["by_recency"],
+                }),
+            );
+        });
+
+        it("updates an existing list based on the key", async () => {
+            const listKey = "key";
+            mocked(slidingSync.getListParams).mockReturnValue({
+                ranges: [[0, 42]],
+            });
+            mocked(slidingSync.setList).mockResolvedValue("yep");
+            await manager.ensureListRegistered(listKey, {
+                sort: ["by_recency"],
+            });
+            expect(slidingSync.setList).toBeCalledWith(
+                listKey,
+                expect.objectContaining({
+                    sort: ["by_recency"],
+                    ranges: [[0, 42]],
+                }),
+            );
+        });
+
+        it("updates ranges on an existing list based on the key if there's no other changes", async () => {
+            const listKey = "key";
+            mocked(slidingSync.getListParams).mockReturnValue({
+                ranges: [[0, 42]],
+            });
+            mocked(slidingSync.setList).mockResolvedValue("yep");
+            await manager.ensureListRegistered(listKey, {
+                ranges: [[0, 52]],
+            });
+            expect(slidingSync.setList).not.toBeCalled();
+            expect(slidingSync.setListRanges).toBeCalledWith(listKey, [[0, 52]]);
+        });
+
+        it("no-ops for idential changes", async () => {
+            const listKey = "key";
+            mocked(slidingSync.getListParams).mockReturnValue({
+                ranges: [[0, 42]],
+                sort: ["by_recency"],
+            });
+            mocked(slidingSync.setList).mockResolvedValue("yep");
+            await manager.ensureListRegistered(listKey, {
+                ranges: [[0, 42]],
+                sort: ["by_recency"],
+            });
+            expect(slidingSync.setList).not.toBeCalled();
+            expect(slidingSync.setListRanges).not.toBeCalled();
+        });
+    });
+
     describe("startSpidering", () => {
         it("requests in batchSizes", async () => {
             const gapMs = 1;
             const batchSize = 10;
             mocked(slidingSync.setList).mockResolvedValue("yep");
             mocked(slidingSync.setListRanges).mockResolvedValue("yep");
-            mocked(slidingSync.getListData).mockImplementation((i) => {
+            mocked(slidingSync.getListData).mockImplementation((key) => {
                 return {
                     joinedCount: 64,
                     roomIndexToRoomId: {},
@@ -93,32 +156,37 @@ describe('SlidingSyncManager', () => {
             await manager.startSpidering(batchSize, gapMs);
             // we expect calls for 10,19 -> 20,29 -> 30,39 -> 40,49 -> 50,59 -> 60,69
             const wantWindows = [
-                [10, 19], [20, 29], [30, 39], [40, 49], [50, 59], [60, 69],
+                [10, 19],
+                [20, 29],
+                [30, 39],
+                [40, 49],
+                [50, 59],
+                [60, 69],
             ];
             expect(slidingSync.getListData).toBeCalledTimes(wantWindows.length);
             expect(slidingSync.setList).toBeCalledTimes(1);
-            expect(slidingSync.setListRanges).toBeCalledTimes(wantWindows.length-1);
+            expect(slidingSync.setListRanges).toBeCalledTimes(wantWindows.length - 1);
             wantWindows.forEach((range, i) => {
                 if (i === 0) {
                     expect(slidingSync.setList).toBeCalledWith(
-                        manager.getOrAllocateListIndex(SlidingSyncManager.ListSearch),
+                        SlidingSyncManager.ListSearch,
                         expect.objectContaining({
-                            ranges: [[0, batchSize-1], range],
+                            ranges: [[0, batchSize - 1], range],
                         }),
                     );
                     return;
                 }
-                expect(slidingSync.setListRanges).toBeCalledWith(
-                    manager.getOrAllocateListIndex(SlidingSyncManager.ListSearch),
-                    [[0, batchSize-1], range],
-                );
+                expect(slidingSync.setListRanges).toBeCalledWith(SlidingSyncManager.ListSearch, [
+                    [0, batchSize - 1],
+                    range,
+                ]);
             });
         });
         it("handles accounts with zero rooms", async () => {
             const gapMs = 1;
             const batchSize = 10;
             mocked(slidingSync.setList).mockResolvedValue("yep");
-            mocked(slidingSync.getListData).mockImplementation((i) => {
+            mocked(slidingSync.getListData).mockImplementation((key) => {
                 return {
                     joinedCount: 0,
                     roomIndexToRoomId: {},
@@ -128,9 +196,12 @@ describe('SlidingSyncManager', () => {
             expect(slidingSync.getListData).toBeCalledTimes(1);
             expect(slidingSync.setList).toBeCalledTimes(1);
             expect(slidingSync.setList).toBeCalledWith(
-                manager.getOrAllocateListIndex(SlidingSyncManager.ListSearch),
+                SlidingSyncManager.ListSearch,
                 expect.objectContaining({
-                    ranges: [[0, batchSize-1], [batchSize, batchSize+batchSize-1]],
+                    ranges: [
+                        [0, batchSize - 1],
+                        [batchSize, batchSize + batchSize - 1],
+                    ],
                 }),
             );
         });
@@ -138,7 +209,7 @@ describe('SlidingSyncManager', () => {
             const gapMs = 1;
             const batchSize = 10;
             mocked(slidingSync.setList).mockRejectedValue("narp");
-            mocked(slidingSync.getListData).mockImplementation((i) => {
+            mocked(slidingSync.getListData).mockImplementation((key) => {
                 return {
                     joinedCount: 0,
                     roomIndexToRoomId: {},
@@ -148,9 +219,12 @@ describe('SlidingSyncManager', () => {
             expect(slidingSync.getListData).toBeCalledTimes(1);
             expect(slidingSync.setList).toBeCalledTimes(1);
             expect(slidingSync.setList).toBeCalledWith(
-                manager.getOrAllocateListIndex(SlidingSyncManager.ListSearch),
+                SlidingSyncManager.ListSearch,
                 expect.objectContaining({
-                    ranges: [[0, batchSize-1], [batchSize, batchSize+batchSize-1]],
+                    ranges: [
+                        [0, batchSize - 1],
+                        [batchSize, batchSize + batchSize - 1],
+                    ],
                 }),
             );
         });
