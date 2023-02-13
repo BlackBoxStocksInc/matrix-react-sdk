@@ -345,8 +345,8 @@ export default class TextualBody extends React.Component<IBodyProps, IState> {
                 const reason = node.getAttribute("data-mx-spoiler");
                 node.removeAttribute("data-mx-spoiler"); // we don't want to recurse
                 const spoiler = <Spoiler reason={reason} contentHtml={node.outerHTML} />;
-
-                ReactDOM.render(spoiler, spoilerContainer);
+                const root = createRoot(spoilerContainer); // createRoot(container!) if you use TypeScript
+                root.render(spoiler);
                 node.parentNode.replaceChild(spoilerContainer, node);
 
                 node = spoilerContainer;
