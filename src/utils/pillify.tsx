@@ -23,6 +23,7 @@ import { MatrixClientPeg } from "../MatrixClientPeg";
 import SettingsStore from "../settings/SettingsStore";
 import Pill, { PillType } from "../components/views/elements/Pill";
 import { parsePermalink } from "./permalinks/Permalinks";
+import { createRoot } from "react-dom/client";
 
 /**
  * Recurses depth-first through a DOM tree, converting matrix.to links
@@ -59,8 +60,8 @@ export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pi
                 const pill = (
                     <Pill url={href} inMessage={true} room={room} shouldShowPillAvatar={shouldShowPillAvatar} />
                 );
-
-                ReactDOM.render(pill, pillContainer);
+                const root = createRoot(pillContainer);
+                root.render(pill);
                 node.parentNode.replaceChild(pillContainer, node);
                 pills.push(pillContainer);
                 // Pills within pills aren't going to go well, so move on
@@ -117,8 +118,8 @@ export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pi
                                 shouldShowPillAvatar={shouldShowPillAvatar}
                             />
                         );
-
-                        ReactDOM.render(pill, pillContainer);
+                        const root = createRoot(pillContainer);
+                        root.render(pill);
                         roomNotifTextNode.parentNode.replaceChild(pillContainer, roomNotifTextNode);
                         pills.push(pillContainer);
                     }
