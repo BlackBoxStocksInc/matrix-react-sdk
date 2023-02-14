@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import React, { createRef, SyntheticEvent, MouseEvent, ReactNode } from "react";
+import { createRoot } from 'react-dom/client';
 import ReactDOM from "react-dom";
 import highlight from "highlight.js";
 import { MsgType } from "matrix-js-sdk/src/@types/event";
