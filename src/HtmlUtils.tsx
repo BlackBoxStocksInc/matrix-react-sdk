@@ -319,6 +319,7 @@ const sanitizeHtmlParams: IExtendedSanitizeOptions = {
     transformTags,
     // 50 levels deep "should be enough for anyone"
     nestingLimit: 50,
+    allowVulnerableTags: true,
 };
 
 // this is the same as the above except with less rewriting
