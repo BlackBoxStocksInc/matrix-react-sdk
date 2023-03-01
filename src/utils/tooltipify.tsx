@@ -19,6 +19,7 @@ import ReactDOM from "react-dom";
 
 import PlatformPeg from "../PlatformPeg";
 import LinkWithTooltip from "../components/views/elements/LinkWithTooltip";
+import { createRoot, Root } from "react-dom/client";
 
 /**
  * If the platform enabled needsUrlTooltips, recurses depth-first through a DOM tree, adding tooltip previews
@@ -31,7 +32,7 @@ import LinkWithTooltip from "../components/views/elements/LinkWithTooltip";
  *   React components that have been mounted by this function. The initial caller
  *   should pass in an empty array to seed the accumulator.
  */
-export function tooltipifyLinks(rootNodes: ArrayLike<Element>, ignoredNodes: Element[], containers: Element[]): void {
+export function tooltipifyLinks(rootNodes: ArrayLike<Element>, ignoredNodes: Element[], containers: Element[], roots: Root[]): void {
     if (!PlatformPeg.get()?.needsUrlTooltips()) {
         return;
     }
@@ -64,11 +65,13 @@ export function tooltipifyLinks(rootNodes: ArrayLike<Element>, ignoredNodes: Ele
                     <span dangerouslySetInnerHTML={{ __html: node.innerHTML }} />
                 </LinkWithTooltip>
             );
-
-            ReactDOM.render(tooltip, node);
+            const root = createRoot(node);
+            root.render(tooltip);
+            
             containers.push(node);
+            roots.push(root);
         } else if (node.childNodes?.length) {
-            tooltipifyLinks(node.childNodes as NodeListOf<Element>, ignoredNodes, containers);
+            tooltipifyLinks(node.childNodes as NodeListOf<Element>, ignoredNodes, containers, roots);
         }
 
         node = node.nextSibling as Element;
@@ -83,8 +86,8 @@ export function tooltipifyLinks(rootNodes: ArrayLike<Element>, ignoredNodes: Ele
  *
  * @param {Element[]} containers - array of tooltip containers to unmount
  */
-export function unmountTooltips(containers: Element[]): void {
+export function unmountTooltips(containers: Root[]): void {
     for (const container of containers) {
-        ReactDOM.unmountComponentAtNode(container);
+        container.unmount();
     }
 }
