@@ -23,7 +23,7 @@ import { MatrixClientPeg } from "../MatrixClientPeg";
 import SettingsStore from "../settings/SettingsStore";
 import Pill, { PillType } from "../components/views/elements/Pill";
 import { parsePermalink } from "./permalinks/Permalinks";
-import { createRoot } from "react-dom/client";
+import { createRoot, Root } from "react-dom/client";
 
 /**
  * Recurses depth-first through a DOM tree, converting matrix.to links
@@ -38,7 +38,7 @@ import { createRoot } from "react-dom/client";
  *   React components which have been mounted as part of this.
  *   The initial caller should pass in an empty array to seed the accumulator.
  */
-export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pills: Element[]): void {
+export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pills: Element[], roots: Root[]): void {
     const room = MatrixClientPeg.get().getRoom(mxEvent.getRoomId());
     const shouldShowPillAvatar = SettingsStore.getValue("Pill.shouldShowPillAvatar");
     let node = nodes[0];
@@ -64,6 +64,7 @@ export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pi
                 root.render(pill);
                 node.parentNode.replaceChild(pillContainer, node);
                 pills.push(pillContainer);
+                roots.push(root);
                 // Pills within pills aren't going to go well, so move on
                 pillified = true;
 
@@ -122,6 +123,7 @@ export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pi
                         root.render(pill);
                         roomNotifTextNode.parentNode.replaceChild(pillContainer, roomNotifTextNode);
                         pills.push(pillContainer);
+                        roots.push(root);
                     }
                     // Nothing else to do for a text node (and we don't need to advance
                     // the loop pointer because we did it above)
@@ -131,7 +133,7 @@ export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pi
         }
 
         if (node.childNodes && node.childNodes.length && !pillified) {
-            pillifyLinks(node.childNodes as NodeListOf<Element>, mxEvent, pills);
+            pillifyLinks(node.childNodes as NodeListOf<Element>, mxEvent, pills, roots);
         }
 
         node = node.nextSibling as Element;
@@ -149,8 +151,8 @@ export function pillifyLinks(nodes: ArrayLike<Element>, mxEvent: MatrixEvent, pi
  * @param {Element[]} pills - array of pill containers whose React
  *   components should be unmounted.
  */
-export function unmountPills(pills: Element[]): void {
+export function unmountPills(pills: Root[]): void {
     for (const pillContainer of pills) {
-        ReactDOM.unmountComponentAtNode(pillContainer);
+        pillContainer.unmount();
     }
 }

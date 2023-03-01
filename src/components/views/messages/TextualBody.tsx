@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import React, { createRef, SyntheticEvent, MouseEvent, ReactNode } from "react";
-import { createRoot } from 'react-dom/client';
+import { createRoot, Root } from 'react-dom/client';
 import ReactDOM from "react-dom";
 import highlight from "highlight.js";
 import { MsgType } from "matrix-js-sdk/src/@types/event";
@@ -66,7 +66,9 @@ export default class TextualBody extends React.Component<IBodyProps, IState> {
 
     private unmounted = false;
     private pills: Element[] = [];
+    private pillRoots: Root[] = [];
     private tooltips: Element[] = [];
+    private tooltipRoots: Root[] = [];
 
     public static contextType = RoomContext;
     public context!: React.ContextType<typeof RoomContext>;
@@ -93,7 +95,7 @@ export default class TextualBody extends React.Component<IBodyProps, IState> {
         // pillifyLinks BEFORE linkifyElement because plain room/user URLs in the composer
         // are still sent as plaintext URLs. If these are ever pillified in the composer,
         // we should be pillify them here by doing the linkifying BEFORE the pillifying.
-        pillifyLinks([this.contentRef.current], this.props.mxEvent, this.pills);
+        pillifyLinks([this.contentRef.current], this.props.mxEvent, this.pills, this.pillRoots);
         HtmlUtils.linkifyElement(this.contentRef.current);
 
         this.calculateUrlPreview();
@@ -101,7 +103,7 @@ export default class TextualBody extends React.Component<IBodyProps, IState> {
         // tooltipifyLinks AFTER calculateUrlPreview because the DOM inside the tooltip
         // container is empty before the internal component has mounted so calculateUrlPreview
         // won't find any anchors
-        tooltipifyLinks([this.contentRef.current], this.pills, this.tooltips);
+        tooltipifyLinks([this.contentRef.current], this.pills, this.tooltips, this.tooltipRoots);
 
         if (this.props.mxEvent.getContent().format === "org.matrix.custom.html") {
             // Handle expansion and add buttons
@@ -294,8 +296,8 @@ export default class TextualBody extends React.Component<IBodyProps, IState> {
 
     public componentWillUnmount(): void {
         this.unmounted = true;
-        unmountPills(this.pills);
-        unmountTooltips(this.tooltips);
+        unmountPills(this.pillRoots);
+        unmountTooltips(this.tooltipRoots);
     }
 
     public shouldComponentUpdate(nextProps: Readonly<IBodyProps>, nextState: Readonly<IState>): boolean {

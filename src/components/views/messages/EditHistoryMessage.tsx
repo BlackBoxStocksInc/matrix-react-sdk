@@ -31,6 +31,7 @@ import AccessibleButton from "../elements/AccessibleButton";
 import ConfirmAndWaitRedactDialog from "../dialogs/ConfirmAndWaitRedactDialog";
 import ViewSource from "../../structures/ViewSource";
 import SettingsStore from "../../../settings/SettingsStore";
+import { Root } from "react-dom/client";
 
 function getReplacedContent(event: MatrixEvent): IContent {
     const originalContent = event.getOriginalContent();
@@ -54,6 +55,8 @@ export default class EditHistoryMessage extends React.PureComponent<IProps, ISta
     private content = createRef<HTMLDivElement>();
     private pills: Element[] = [];
     private tooltips: Element[] = [];
+    private pillRoots: Root[] = [];
+    private tooltipRoots: Root[] = [];
 
     public constructor(props: IProps) {
         super(props);
@@ -99,14 +102,14 @@ export default class EditHistoryMessage extends React.PureComponent<IProps, ISta
     private pillifyLinks(): void {
         // not present for redacted events
         if (this.content.current) {
-            pillifyLinks(this.content.current.children, this.props.mxEvent, this.pills);
+            pillifyLinks(this.content.current.children, this.props.mxEvent, this.pills, this.pillRoots);
         }
     }
 
     private tooltipifyLinks(): void {
         // not present for redacted events
         if (this.content.current) {
-            tooltipifyLinks(this.content.current.children, this.pills, this.tooltips);
+            tooltipifyLinks(this.content.current.children, this.pills, this.tooltips, this.tooltipRoots);
         }
     }
 
@@ -116,8 +119,8 @@ export default class EditHistoryMessage extends React.PureComponent<IProps, ISta
     }
 
     public componentWillUnmount(): void {
-        unmountPills(this.pills);
-        unmountTooltips(this.tooltips);
+        unmountPills(this.pillRoots);
+        unmountTooltips(this.tooltipRoots);
         const event = this.props.mxEvent;
         if (event.localRedactionEvent()) {
             event.localRedactionEvent().off(MatrixEventEvent.Status, this.onAssociatedStatusChanged);
