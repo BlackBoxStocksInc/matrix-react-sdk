@@ -37,93 +37,6 @@ $container-border-width: 8px;
 $container-gap-width: 8px; /* only even numbers should be used because otherwise we get 0.5px margin values. */
 
 $timeline-image-border-radius: 8px;
-:root {
-    font-size: 10px;
-
-    --transition-short: 0.1s;
-    --transition-standard: 0.3s;
-}
-
-@media (prefers-reduced-motion) {
-    :root {
-        --transition-short: 0;
-        --transition-standard: 0;
-    }
-}
-
-html {
-    /* hack to stop overscroll bounce on OSX and iOS.
-       N.B. Breaks things when we have legitimate horizontal overscroll */
-    height: 100%;
-    overflow: hidden;
-    /* Stop similar overscroll bounce in Firefox Nightly for macOS */
-    overscroll-behavior: none;
-}
-
-body {
-    font-family: $font-family;
-    font-size: $font-15px;
-    background-color: $background;
-    color: $primary-content;
-    border: 0px;
-    margin: 0px;
-
-    /* needed to match the designs correctly on macOS */
-    /* see https://github.com/vector-im/element-web/issues/11425 */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-pre,
-code {
-    font-family: $monospace-font-family;
-    font-size: 100% !important;
-}
-
-.error,
-.warning,
-.text-error,
-.text-warning {
-    color: $alert;
-}
-
-.text-success {
-    color: $accent;
-}
-
-.text-muted {
-    color: $muted-fg-color;
-}
-
-b {
-    /* On Firefox, the default weight for `<b>` is `bolder` which results in no bold */
-    /* effect since we only have specific weights of our fonts available. */
-    font-weight: bold;
-}
-
-h2 {
-    color: $primary-content;
-    font-weight: 400;
-    font-size: $font-18px;
-    margin-top: 16px;
-    margin-bottom: 16px;
-}
-
-a:hover,
-a:link,
-a:visited {
-    color: $accent-alt;
-}
-
-input[type="text"],
-input[type="search"],
-input[type="password"] {
-    font-family: inherit;
-    padding: 9px;
-    font-size: $font-14px;
-    font-weight: 600;
-    min-width: 0;
-}
 
 input[type="text"].mx_textinput_icon,
 input[type="search"].mx_textinput_icon {
@@ -145,39 +58,6 @@ input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-results-button,
 input[type="search"]::-webkit-search-results-decoration {
     display: none;
-}
-
-/* Override Firefox's UA style so we get a consistent look across browsers */
-input::placeholder,
-textarea::placeholder {
-    opacity: initial;
-}
-
-input[type="text"],
-input[type="password"],
-textarea {
-    background-color: transparent;
-    color: $primary-content;
-}
-
-/* Required by Firefox */
-textarea {
-    color: $primary-content;
-}
-
-input[type="text"]:focus,
-input[type="password"]:focus,
-textarea:focus {
-    outline: none;
-    box-shadow: none;
-}
-
-/* This is used to hide the standard outline added by browsers for */
-/* accessible (focusable) components. Not intended for buttons, but */
-/* should be used on things like focusable containers where the outline */
-/* is usually not helping anyone. */
-*:focus:not(.focus-visible) {
-    outline: none;
 }
 
 /* override defaults */
