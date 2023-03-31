@@ -17,30 +17,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { ReactElement, ReactNode } from "react";
-import sanitizeHtml from "sanitize-html";
-import cheerio from "cheerio";
-import classNames from "classnames";
-import EMOJIBASE_REGEX from "emojibase-regex";
-import { merge, split } from "lodash";
-import katex from "katex";
-import { decode } from "html-entities";
-import { IContent } from "matrix-js-sdk/src/models/event";
-import { Optional } from "matrix-events-sdk";
-import _Linkify from "linkify-react";
-
 import {
+    ELEMENT_URL_PATTERN,
     _linkifyElement,
     _linkifyString,
-    ELEMENT_URL_PATTERN,
     options as linkifyMatrixOptions,
 } from "./linkify-matrix";
-import { IExtendedSanitizeOptions } from "./@types/sanitize-html";
-import SettingsStore from "./settings/SettingsStore";
-import { tryTransformPermalinkToLocalHref } from "./utils/permalinks/Permalinks";
-import { getEmojiFromUnicode } from "./emoji";
-import { mediaFromMxc } from "./customisations/Media";
+import React, { ReactElement, ReactNode } from "react";
+import { merge, split } from "lodash";
 import { stripHTMLReply, stripPlainReply } from "./utils/Reply";
+
+import EMOJIBASE_REGEX from "emojibase-regex";
+import { IContent } from "matrix-js-sdk/src/models/event";
+import { IExtendedSanitizeOptions } from "./@types/sanitize-html";
+import { Optional } from "matrix-events-sdk";
+import SettingsStore from "./settings/SettingsStore";
+import _Linkify from "linkify-react";
+import cheerio from "cheerio";
+import classNames from "classnames";
+import { decode } from "html-entities";
+import { getEmojiFromUnicode } from "./emoji";
+import katex from "katex";
+import { mediaFromMxc } from "./customisations/Media";
+import sanitizeHtml from "sanitize-html";
+import { tryTransformPermalinkToLocalHref } from "./utils/permalinks/Permalinks";
 
 // Anything outside the basic multilingual plane will be a surrogate pair
 const SURROGATE_PAIR_PATTERN = /([\ud800-\udbff])([\udc00-\udfff])/;
@@ -168,44 +168,47 @@ const transformTags: IExtendedSanitizeOptions["transformTags"] = {
         return { tagName, attribs };
     },
     "img": function (tagName: string, attribs: sanitizeHtml.Attributes) {
-        let src = attribs.src;
-        // Strip out imgs that aren't `mxc` here instead of using allowedSchemesByTag
-        // because transformTags is used _before_ we filter by allowedSchemesByTag and
-        // we don't want to allow images with `https?` `src`s.
-        // We also drop inline images (as if they were not present at all) when the "show
-        // images" preference is disabled. Future work might expose some UI to reveal them
-        // like standalone image events have.
-        if (!src || !SettingsStore.getValue("showImages")) {
-            return { tagName, attribs: {} };
-        }
-
-        if (!src.startsWith("mxc://")) {
-            const match = MEDIA_API_MXC_REGEX.exec(src);
-            if (match) {
-                src = `mxc://${match[1]}/${match[2]}`;
-            }
-        }
-
-        if (!src.startsWith("mxc://")) {
-            return { tagName, attribs: {} };
-        }
-
-        const requestedWidth = Number(attribs.width);
-        const requestedHeight = Number(attribs.height);
-        const width = Math.min(requestedWidth || 800, 800);
-        const height = Math.min(requestedHeight || 600, 600);
-        // specify width/height as max values instead of absolute ones to allow object-fit to do its thing
-        // we only allow our own styles for this tag so overwrite the attribute
-        attribs.style = `max-width: ${width}px; max-height: ${height}px;`;
-        if (requestedWidth) {
-            attribs.style += "width: 100%;";
-        }
-        if (requestedHeight) {
-            attribs.style += "height: 100%;";
-        }
-
-        attribs.src = mediaFromMxc(src).getThumbnailOfSourceHttp(width, height);
+        // NOTES: We ignore img tags because we inject our own img tags
         return { tagName, attribs };
+
+        // let src = attribs.src;
+        // // Strip out imgs that aren't `mxc` here instead of using allowedSchemesByTag
+        // // because transformTags is used _before_ we filter by allowedSchemesByTag and
+        // // we don't want to allow images with `https?` `src`s.
+        // // We also drop inline images (as if they were not present at all) when the "show
+        // // images" preference is disabled. Future work might expose some UI to reveal them
+        // // like standalone image events have.
+        // if (!src || !SettingsStore.getValue("showImages")) {
+        //     return { tagName, attribs: {} };
+        // }
+
+        // if (!src.startsWith("mxc://")) {
+        //     const match = MEDIA_API_MXC_REGEX.exec(src);
+        //     if (match) {
+        //         src = `mxc://${match[1]}/${match[2]}`;
+        //     }
+        // }
+
+        // if (!src.startsWith("mxc://")) {
+        //     return { tagName, attribs: {} };
+        // }
+
+        // const requestedWidth = Number(attribs.width);
+        // const requestedHeight = Number(attribs.height);
+        // const width = Math.min(requestedWidth || 800, 800);
+        // const height = Math.min(requestedHeight || 600, 600);
+        // // specify width/height as max values instead of absolute ones to allow object-fit to do its thing
+        // // we only allow our own styles for this tag so overwrite the attribute
+        // attribs.style = `max-width: ${width}px; max-height: ${height}px;`;
+        // if (requestedWidth) {
+        //     attribs.style += "width: 100%;";
+        // }
+        // if (requestedHeight) {
+        //     attribs.style += "height: 100%;";
+        // }
+
+        // attribs.src = mediaFromMxc(src).getThumbnailOfSourceHttp(width, height);
+        // return { tagName, attribs };
     },
     "code": function (tagName: string, attribs: sanitizeHtml.Attributes) {
         if (typeof attribs.class !== "undefined") {
