@@ -168,47 +168,49 @@ const transformTags: IExtendedSanitizeOptions["transformTags"] = {
         return { tagName, attribs };
     },
     "img": function (tagName: string, attribs: sanitizeHtml.Attributes) {
-        // NOTES: We ignore img tags because we inject our own img tags
+        let src = attribs.src;
+
+        // NOTE: We do want to allow flowplay images
+        if (src.startsWith('https://blackboxstocksflowplay.s3.us-east-1.amazonaws.com')) {
+            return { tagName, attribs };
+        }
+        // Strip out imgs that aren't `mxc` here instead of using allowedSchemesByTag
+        // because transformTags is used _before_ we filter by allowedSchemesByTag and
+        // we don't want to allow images with `https?` `src`s.
+        // We also drop inline images (as if they were not present at all) when the "show
+        // images" preference is disabled. Future work might expose some UI to reveal them
+        // like standalone image events have.
+        if (!src || !SettingsStore.getValue("showImages")) {
+            return { tagName, attribs: {} };
+        }
+
+        if (!src.startsWith("mxc://")) {
+            const match = MEDIA_API_MXC_REGEX.exec(src);
+            if (match) {
+                src = `mxc://${match[1]}/${match[2]}`;
+            }
+        }
+
+        if (!src.startsWith("mxc://")) {
+            return { tagName, attribs: {} };
+        }
+
+        const requestedWidth = Number(attribs.width);
+        const requestedHeight = Number(attribs.height);
+        const width = Math.min(requestedWidth || 800, 800);
+        const height = Math.min(requestedHeight || 600, 600);
+        // specify width/height as max values instead of absolute ones to allow object-fit to do its thing
+        // we only allow our own styles for this tag so overwrite the attribute
+        attribs.style = `max-width: ${width}px; max-height: ${height}px;`;
+        if (requestedWidth) {
+            attribs.style += "width: 100%;";
+        }
+        if (requestedHeight) {
+            attribs.style += "height: 100%;";
+        }
+
+        attribs.src = mediaFromMxc(src).getThumbnailOfSourceHttp(width, height);
         return { tagName, attribs };
-
-        // let src = attribs.src;
-        // // Strip out imgs that aren't `mxc` here instead of using allowedSchemesByTag
-        // // because transformTags is used _before_ we filter by allowedSchemesByTag and
-        // // we don't want to allow images with `https?` `src`s.
-        // // We also drop inline images (as if they were not present at all) when the "show
-        // // images" preference is disabled. Future work might expose some UI to reveal them
-        // // like standalone image events have.
-        // if (!src || !SettingsStore.getValue("showImages")) {
-        //     return { tagName, attribs: {} };
-        // }
-
-        // if (!src.startsWith("mxc://")) {
-        //     const match = MEDIA_API_MXC_REGEX.exec(src);
-        //     if (match) {
-        //         src = `mxc://${match[1]}/${match[2]}`;
-        //     }
-        // }
-
-        // if (!src.startsWith("mxc://")) {
-        //     return { tagName, attribs: {} };
-        // }
-
-        // const requestedWidth = Number(attribs.width);
-        // const requestedHeight = Number(attribs.height);
-        // const width = Math.min(requestedWidth || 800, 800);
-        // const height = Math.min(requestedHeight || 600, 600);
-        // // specify width/height as max values instead of absolute ones to allow object-fit to do its thing
-        // // we only allow our own styles for this tag so overwrite the attribute
-        // attribs.style = `max-width: ${width}px; max-height: ${height}px;`;
-        // if (requestedWidth) {
-        //     attribs.style += "width: 100%;";
-        // }
-        // if (requestedHeight) {
-        //     attribs.style += "height: 100%;";
-        // }
-
-        // attribs.src = mediaFromMxc(src).getThumbnailOfSourceHttp(width, height);
-        // return { tagName, attribs };
     },
     "code": function (tagName: string, attribs: sanitizeHtml.Attributes) {
         if (typeof attribs.class !== "undefined") {
