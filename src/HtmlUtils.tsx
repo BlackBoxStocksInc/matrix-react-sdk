@@ -315,6 +315,7 @@ const sanitizeHtmlParams: IExtendedSanitizeOptions = {
         img: ["src", "alt", "title", "style"],
         ol: ["start"],
         code: ["class"], // We don't actually allow all classes, we filter them in transformTags
+        table: ["class", "style"],
     },
     // Lots of these won't come up by default because we don't allow them
     selfClosing: ["img", "br", "hr", "area", "base", "basefont", "input", "link", "meta"],
