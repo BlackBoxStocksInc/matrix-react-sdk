@@ -503,7 +503,7 @@ export default class MImageBody extends React.Component<IBodyProps, IState> {
                 {placeholder}
 
                 <div style={sizing}>
-                    {eventContent?.body}
+                    {eventContent?.formatted_body}
                     {img}
                     {gifLabel}
                     {banner}
