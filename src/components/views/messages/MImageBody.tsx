@@ -15,31 +15,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { ComponentProps, createRef } from "react";
-import { Blurhash } from "react-blurhash";
-import classNames from "classnames";
-import { CSSTransition, SwitchTransition } from "react-transition-group";
-import { logger } from "matrix-js-sdk/src/logger";
-import { ClientEvent, ClientEventHandlerMap } from "matrix-js-sdk/src/client";
-
-import MFileBody from "./MFileBody";
-import Modal from "../../../Modal";
-import { _t } from "../../../languageHandler";
-import SettingsStore from "../../../settings/SettingsStore";
-import Spinner from "../elements/Spinner";
-import { Media, mediaFromContent } from "../../../customisations/Media";
 import { BLURHASH_FIELD, createThumbnail } from "../../../utils/image-media";
-import { IMediaEventContent } from "../../../customisations/models/IMediaEventContent";
-import ImageView from "../elements/ImageView";
-import { IBodyProps } from "./IBodyProps";
+import { CSSTransition, SwitchTransition } from "react-transition-group";
+import { ClientEvent, ClientEventHandlerMap } from "matrix-js-sdk/src/client";
+import { DecryptError, DownloadError } from "../../../utils/DecryptFile";
 import { ImageSize, suggestedSize as suggestedImageSize } from "../../../settings/enums/ImageSize";
-import { MatrixClientPeg } from "../../../MatrixClientPeg";
+import { Media, mediaFromContent } from "../../../customisations/Media";
+import React, { ComponentProps, createRef } from "react";
 import RoomContext, { TimelineRenderingType } from "../../../contexts/RoomContext";
 import { blobIsAnimated, mayBeAnimated } from "../../../utils/Image";
-import { presentableTextForFile } from "../../../utils/FileUtils";
-import { createReconnectedListener } from "../../../utils/connection";
+
+import { Blurhash } from "react-blurhash";
+import { IBodyProps } from "./IBodyProps";
+import { IMediaEventContent } from "../../../customisations/models/IMediaEventContent";
+import ImageView from "../elements/ImageView";
+import MFileBody from "./MFileBody";
+import { MatrixClientPeg } from "../../../MatrixClientPeg";
 import MediaProcessingError from "./shared/MediaProcessingError";
-import { DecryptError, DownloadError } from "../../../utils/DecryptFile";
+import Modal from "../../../Modal";
+import SettingsStore from "../../../settings/SettingsStore";
+import Spinner from "../elements/Spinner";
+import { _t } from "../../../languageHandler";
+import classNames from "classnames";
+import { createReconnectedListener } from "../../../utils/connection";
+import { logger } from "matrix-js-sdk/src/logger";
+import { presentableTextForFile } from "../../../utils/FileUtils";
 
 enum Placeholder {
     NoImage,
@@ -491,6 +491,10 @@ export default class MImageBody extends React.Component<IBodyProps, IState> {
             );
         }
 
+        const { mxEvent } = this.props;
+
+        const eventContent = mxEvent?.getContent();
+
         const thumbnail = (
             <div
                 className="mx_MImageBody_thumbnail_container"
@@ -499,6 +503,7 @@ export default class MImageBody extends React.Component<IBodyProps, IState> {
                 {placeholder}
 
                 <div style={sizing}>
+                    {eventContent?.body}
                     {img}
                     {gifLabel}
                     {banner}
