@@ -15,20 +15,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React from "react";
-import { filesize } from "filesize";
-
-import { Icon as FileIcon } from "../../../../res/img/feather-customised/files.svg";
-import { _t } from "../../../languageHandler";
-import { getBlobSafeMimeType } from "../../../utils/blobs";
 import BaseDialog from "./BaseDialog";
 import DialogButtons from "../elements/DialogButtons";
+import { Icon as FileIcon } from "../../../../res/img/feather-customised/files.svg";
+import React from "react";
+import { _t } from "../../../languageHandler";
+import { filesize } from "filesize";
+import { getBlobSafeMimeType } from "../../../utils/blobs";
 
 interface IProps {
     file: File;
     currentIndex: number;
     totalFiles?: number;
-    onFinished: (uploadConfirmed: boolean, uploadAll?: boolean) => void;
+    onFinished: (uploadConfirmed: boolean, uploadAll?: boolean, caption?: string) => void;
 }
 
 export default class UploadConfirmDialog extends React.Component<IProps> {
@@ -47,6 +46,7 @@ export default class UploadConfirmDialog extends React.Component<IProps> {
         this.mimeType = getBlobSafeMimeType(props.file.type);
         const blob = new Blob([props.file], { type: this.mimeType });
         this.objectUrl = URL.createObjectURL(blob);
+        this.state = { caption: "" };
     }
 
     public componentWillUnmount(): void {
@@ -58,7 +58,7 @@ export default class UploadConfirmDialog extends React.Component<IProps> {
     };
 
     private onUploadClick = (): void => {
-        this.props.onFinished(true);
+        this.props.onFinished(true, false, this.state.caption);
     };
 
     private onUploadAllClick = (): void => {
@@ -117,9 +117,12 @@ export default class UploadConfirmDialog extends React.Component<IProps> {
                                 {placeholder}
                                 {this.props.file.name} ({filesize(this.props.file.size)})
                             </div>
+                            <input type="text" style={{ padding: '1rem', margin: '1rem 0', backgroundColor: '#212a33', width: '100%', height: '5rem', color: 'white' }} placeholder="Add a caption" onChange={(e) => this.setState({ caption: e.target.value })} value={this.state.caption} />
                         </div>
                     </div>
                 </div>
+
+
 
                 <DialogButtons
                     primaryButton={_t("Upload")}

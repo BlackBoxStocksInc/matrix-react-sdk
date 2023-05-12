@@ -16,22 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "matrix-js-sdk/src/client";
-import { MsgType } from "matrix-js-sdk/src/@types/event";
-import encrypt from "matrix-encrypt-attachment";
-import extractPngChunks from "png-chunks-extract";
-import { IImageInfo } from "matrix-js-sdk/src/@types/partials";
-import { logger } from "matrix-js-sdk/src/logger";
-import { IEventRelation, ISendEventResponse, MatrixEvent, UploadOpts, UploadProgress } from "matrix-js-sdk/src/matrix";
-import { THREAD_RELATION_TYPE } from "matrix-js-sdk/src/models/thread";
-import { removeElement } from "matrix-js-sdk/src/utils";
-
 import { IEncryptedFile, IMediaEventContent, IMediaEventInfo } from "./customisations/models/IMediaEventContent";
-import dis from "./dispatcher/dispatcher";
-import { _t } from "./languageHandler";
-import Modal from "./Modal";
-import Spinner from "./components/views/elements/Spinner";
-import { Action } from "./dispatcher/actions";
+import { IEventRelation, ISendEventResponse, MatrixEvent, UploadOpts, UploadProgress } from "matrix-js-sdk/src/matrix";
 import {
     UploadCanceledPayload,
     UploadErrorPayload,
@@ -39,18 +25,32 @@ import {
     UploadProgressPayload,
     UploadStartedPayload,
 } from "./dispatcher/payloads/UploadPayload";
-import { RoomUpload } from "./models/RoomUpload";
-import SettingsStore from "./settings/SettingsStore";
 import { decorateStartSendingTime, sendRoundTripMetric } from "./sendTimePerformanceMetrics";
-import { TimelineRenderingType } from "./contexts/RoomContext";
-import { addReplyToMessageContent } from "./utils/Reply";
+
+import { Action } from "./dispatcher/actions";
 import ErrorDialog from "./components/views/dialogs/ErrorDialog";
-import UploadFailureDialog from "./components/views/dialogs/UploadFailureDialog";
-import UploadConfirmDialog from "./components/views/dialogs/UploadConfirmDialog";
-import { createThumbnail } from "./utils/image-media";
-import { attachRelation } from "./components/views/rooms/SendMessageComposer";
-import { doMaybeLocalRoomAction } from "./utils/local-room";
+import { IImageInfo } from "matrix-js-sdk/src/@types/partials";
+import { MatrixClient } from "matrix-js-sdk/src/client";
+import Modal from "./Modal";
+import { MsgType } from "matrix-js-sdk/src/@types/event";
+import { RoomUpload } from "./models/RoomUpload";
 import { SdkContextClass } from "./contexts/SDKContext";
+import SettingsStore from "./settings/SettingsStore";
+import Spinner from "./components/views/elements/Spinner";
+import { THREAD_RELATION_TYPE } from "matrix-js-sdk/src/models/thread";
+import { TimelineRenderingType } from "./contexts/RoomContext";
+import UploadConfirmDialog from "./components/views/dialogs/UploadConfirmDialog";
+import UploadFailureDialog from "./components/views/dialogs/UploadFailureDialog";
+import { _t } from "./languageHandler";
+import { addReplyToMessageContent } from "./utils/Reply";
+import { attachRelation } from "./components/views/rooms/SendMessageComposer";
+import { createThumbnail } from "./utils/image-media";
+import dis from "./dispatcher/dispatcher";
+import { doMaybeLocalRoomAction } from "./utils/local-room";
+import encrypt from "matrix-encrypt-attachment";
+import extractPngChunks from "png-chunks-extract";
+import { logger } from "matrix-js-sdk/src/logger";
+import { removeElement } from "matrix-js-sdk/src/utils";
 
 // scraped out of a macOS hidpi (5660ppm) screenshot png
 //                  5669 px (x-axis)      , 5669 px (y-axis)      , per metre
@@ -405,12 +405,16 @@ export default class ContentMessages {
         for (let i = 0; i < okFiles.length; ++i) {
             const file = okFiles[i];
             const loopPromiseBefore = promBefore;
+            let text = '';
 
             if (!uploadAll) {
                 const { finished } = Modal.createDialog<[boolean, boolean]>(UploadConfirmDialog, {
                     file,
                     currentIndex: i,
                     totalFiles: okFiles.length,
+                    onFinished: (uploadConfirmed: boolean, uploadAll?: boolean, caption?: string) => {
+                        text = caption;
+                    }
                 });
                 const [shouldContinue, shouldUploadAll] = await finished;
                 if (!shouldContinue) break;
@@ -420,7 +424,7 @@ export default class ContentMessages {
             }
 
             promBefore = doMaybeLocalRoomAction(roomId, (actualRoomId) =>
-                this.sendContentToRoom(file, actualRoomId, relation, matrixClient, replyToEvent, loopPromiseBefore),
+                this.sendContentToRoom(file, actualRoomId, relation, matrixClient, replyToEvent, loopPromiseBefore, text),
             );
         }
 
@@ -465,10 +469,11 @@ export default class ContentMessages {
         matrixClient: MatrixClient,
         replyToEvent: MatrixEvent | undefined,
         promBefore?: Promise<any>,
+        body?: string,
     ): Promise<void> {
         const fileName = file.name || _t("Attachment");
         const content: Omit<IMediaEventContent, "info"> & { info: Partial<IMediaEventInfo> } = {
-            body: fileName,
+            body: body ?? fileName,
             info: {
                 size: file.size,
             },
