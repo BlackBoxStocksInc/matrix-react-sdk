@@ -491,10 +491,6 @@ export default class MImageBody extends React.Component<IBodyProps, IState> {
             );
         }
 
-        const { mxEvent } = this.props;
-
-        const eventContent = mxEvent?.getContent();
-
         const thumbnail = (
             <div
                 className="mx_MImageBody_thumbnail_container"
@@ -503,7 +499,6 @@ export default class MImageBody extends React.Component<IBodyProps, IState> {
                 {placeholder}
 
                 <div style={sizing}>
-                    <span dangerouslySetInnerHTML={{ __html: eventContent?.formatted_body }} />
                     {img}
                     {gifLabel}
                     {banner}
