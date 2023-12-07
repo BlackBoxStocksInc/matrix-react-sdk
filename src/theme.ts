@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import { compare } from "matrix-js-sdk/src/utils";
+import { logger } from "matrix-js-sdk/src/logger";
 
 import { _t } from "./languageHandler";
 import SettingsStore from "./settings/SettingsStore";
@@ -26,7 +27,7 @@ const HIGH_CONTRAST_THEMES: Record<string, string> = {
     light: "light-high-contrast",
 };
 
-interface IFontFaces extends Omit<Record<typeof allowedFontFaceProps[number], string>, "src"> {
+interface IFontFaces extends Omit<Record<(typeof allowedFontFaceProps)[number], string>, "src"> {
     src: {
         format: string;
         url: string;
@@ -34,7 +35,8 @@ interface IFontFaces extends Omit<Record<typeof allowedFontFaceProps[number], st
     }[];
 }
 
-interface ICustomTheme {
+export type CustomTheme = {
+    name: string;
     colors: {
         [key: string]: string;
     };
@@ -44,7 +46,7 @@ interface ICustomTheme {
         monospace: string;
     };
     is_dark?: boolean; // eslint-disable-line camelcase
-}
+};
 
 /**
  * Given a non-high-contrast theme, find the corresponding high-contrast one
@@ -75,15 +77,24 @@ export function isHighContrastTheme(theme: string): boolean {
 
 export function enumerateThemes(): { [key: string]: string } {
     const BUILTIN_THEMES = {
-        "light": _t("Light"),
-        "light-high-contrast": _t("Light high contrast"),
-        "dark": _t("Dark"),
+        "light": _t("common|light"),
+        "light-high-contrast": _t("theme|light_high_contrast"),
+        "dark": _t("common|dark"),
     };
-    const customThemes = SettingsStore.getValue("custom_themes");
+    const customThemes = SettingsStore.getValue("custom_themes") || [];
     const customThemeNames: Record<string, string> = {};
-    for (const { name } of customThemes) {
-        customThemeNames[`custom-${name}`] = name;
+
+    try {
+        for (const { name } of customThemes) {
+            customThemeNames[`custom-${name}`] = name;
+        }
+    } catch (err) {
+        logger.warn("Error loading custom themes", {
+            err,
+            customThemes,
+        });
     }
+
     return Object.assign({}, customThemeNames, BUILTIN_THEMES);
 }
 
@@ -133,7 +144,7 @@ function generateCustomFontFaceCSS(faces: IFontFaces[]): string {
         .map((face) => {
             const src = face.src
                 ?.map((srcElement) => {
-                    let format: string;
+                    let format = "";
                     if (srcElement.format) {
                         format = `format("${srcElement.format}")`;
                     }
@@ -145,9 +156,9 @@ function generateCustomFontFaceCSS(faces: IFontFaces[]): string {
                     return "";
                 })
                 .join(", ");
-            const props = Object.keys(face).filter((prop: typeof allowedFontFaceProps[number]) =>
-                allowedFontFaceProps.includes(prop),
-            ) as Array<typeof allowedFontFaceProps[number]>;
+            const props = Object.keys(face).filter((prop) =>
+                allowedFontFaceProps.includes(prop as (typeof allowedFontFaceProps)[number]),
+            ) as Array<(typeof allowedFontFaceProps)[number]>;
             const body = props
                 .map((prop) => {
                     let value: string;
@@ -166,7 +177,7 @@ function generateCustomFontFaceCSS(faces: IFontFaces[]): string {
         .join("\n");
 }
 
-function setCustomThemeVars(customTheme: ICustomTheme): void {
+function setCustomThemeVars(customTheme: CustomTheme): void {
     const { style } = document.body;
 
     function setCSSColorVariable(name: string, hexColor: string, doPct = true): void {
@@ -209,7 +220,7 @@ function setCustomThemeVars(customTheme: ICustomTheme): void {
     }
 }
 
-export function getCustomTheme(themeName: string): ICustomTheme {
+export function getCustomTheme(themeName: string): CustomTheme {
     // set css variables
     const customThemes = SettingsStore.getValue("custom_themes");
     if (!customThemes) {
@@ -248,7 +259,7 @@ export async function setTheme(theme?: string): Promise<void> {
     const styleElements = new Map<string, HTMLLinkElement>();
     const themes = Array.from(document.querySelectorAll<HTMLLinkElement>("[data-mx-theme]"));
     themes.forEach((theme) => {
-        styleElements.set(theme.dataset.mxTheme.toLowerCase(), theme);
+        styleElements.set(theme.dataset.mxTheme!.toLowerCase(), theme);
     });
 
     if (!styleElements.has(stylesheetName)) {
@@ -266,8 +277,26 @@ export async function setTheme(theme?: string): Promise<void> {
     // having them interact badly... but this causes a flash of unstyled app
     // which is even uglier.  So we don't.
 
-    const styleSheet = styleElements.get(stylesheetName);
+    const styleSheet = styleElements.get(stylesheetName)!;
     styleSheet.disabled = false;
+
+    /**
+     * Adds the Compound theme class to the top-most element in the document
+     * This will automatically refresh the colour scales based on the OS or user
+     * preferences
+     *
+     * Note: Theming through Compound is not yet established. Brand theming should
+     * be done in a similar manner as it used to be done.
+     */
+    document.body.classList.remove("cpd-theme-light", "cpd-theme-dark", "cpd-theme-light-hc", "cpd-theme-dark-hc");
+
+    let compoundThemeClassName = `cpd-theme-` + (stylesheetName.includes("light") ? "light" : "dark");
+    // Always respect user OS preference!
+    if (isHighContrastTheme(theme) || window.matchMedia("(prefers-contrast: more)").matches) {
+        compoundThemeClassName += "-hc";
+    }
+
+    document.body.classList.add(compoundThemeClassName);
 
     return new Promise((resolve, reject) => {
         const switchTheme = function (): void {
@@ -282,7 +311,7 @@ export async function setTheme(theme?: string): Promise<void> {
             });
             const bodyStyles = global.getComputedStyle(document.body);
             if (bodyStyles.backgroundColor) {
-                const metaElement: HTMLMetaElement = document.querySelector('meta[name="theme-color"]');
+                const metaElement = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')!;
                 metaElement.content = bodyStyles.backgroundColor;
             }
             resolve();
@@ -306,8 +335,8 @@ export async function setTheme(theme?: string): Promise<void> {
             const intervalId = window.setInterval(() => {
                 if (isStyleSheetLoaded()) {
                     clearInterval(intervalId);
-                    styleSheet.onload = undefined;
-                    styleSheet.onerror = undefined;
+                    styleSheet.onload = null;
+                    styleSheet.onerror = null;
                     switchTheme();
                 }
 

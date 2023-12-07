@@ -17,15 +17,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import React, { LegacyRef, ReactElement, ReactNode } from "react";
+import { merge } from "lodash";
+import escapeHtml from "escape-html";
+
 import {
     ELEMENT_URL_PATTERN,
     _linkifyElement,
     _linkifyString,
     options as linkifyMatrixOptions,
 } from "./linkify-matrix";
-import React, { ReactElement, ReactNode } from "react";
-import { merge, split } from "lodash";
 import { stripHTMLReply, stripPlainReply } from "./utils/Reply";
+import { PERMITTED_URL_SCHEMES } from "./utils/UrlUtils";
 
 import EMOJIBASE_REGEX from "emojibase-regex";
 import { IContent } from "matrix-js-sdk/src/models/event";
@@ -33,10 +36,8 @@ import { IExtendedSanitizeOptions } from "./@types/sanitize-html";
 import { Optional } from "matrix-events-sdk";
 import SettingsStore from "./settings/SettingsStore";
 import _Linkify from "linkify-react";
-import cheerio from "cheerio";
 import classNames from "classnames";
 import { decode } from "html-entities";
-import { getEmojiFromUnicode } from "./emoji";
 import katex from "katex";
 import { mediaFromMxc } from "./customisations/Media";
 import sanitizeHtml from "sanitize-html";
@@ -50,40 +51,13 @@ const SURROGATE_PAIR_PATTERN = /([\ud800-\udbff])([\udc00-\udfff])/;
 // (with plenty of false positives, but that's OK)
 const SYMBOL_PATTERN = /([\u2100-\u2bff])/;
 
-// Regex pattern for non-emoji characters that can appear in an "all-emoji" message (Zero-Width Joiner, Zero-Width Space, other whitespace)
-const EMOJI_SEPARATOR_REGEX = /[\u200D\u200B\s]/g;
+// Regex pattern for non-emoji characters that can appear in an "all-emoji" message
+// (Zero-Width Joiner, Zero-Width Space, Emoji presentation character, other whitespace)
+const EMOJI_SEPARATOR_REGEX = /[\u200D\u200B\s]|\uFE0F/g;
 
 const BIGEMOJI_REGEX = new RegExp(`^(${EMOJIBASE_REGEX.source})+$`, "i");
 
 const COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
-
-export const PERMITTED_URL_SCHEMES = [
-    "bitcoin",
-    "ftp",
-    "geo",
-    "http",
-    "https",
-    "im",
-    "irc",
-    "ircs",
-    "magnet",
-    "mailto",
-    "matrix",
-    "mms",
-    "news",
-    "nntp",
-    "openpgp4fpr",
-    "sip",
-    "sftp",
-    "sms",
-    "smsto",
-    "ssh",
-    "tel",
-    "urn",
-    "webcal",
-    "wtai",
-    "xmpp",
-];
 
 const MEDIA_API_MXC_REGEX = /\/_matrix\/media\/r0\/(?:download|thumbnail)\/(.+?)\/(.+?)(?:[?/]|$)/;
 
@@ -93,8 +67,8 @@ const MEDIA_API_MXC_REGEX = /\/_matrix\/media\/r0\/(?:download|thumbnail)\/(.+?)
  * positives, but useful for fast-path testing strings to see if they
  * need emojification.
  */
-function mightContainEmoji(str: string): boolean {
-    return SURROGATE_PAIR_PATTERN.test(str) || SYMBOL_PATTERN.test(str);
+function mightContainEmoji(str?: string): boolean {
+    return !!str && (SURROGATE_PAIR_PATTERN.test(str) || SYMBOL_PATTERN.test(str));
 }
 
 /**
@@ -209,7 +183,7 @@ const transformTags: IExtendedSanitizeOptions["transformTags"] = {
             attribs.style += "height: 100%;";
         }
 
-        attribs.src = mediaFromMxc(src).getThumbnailOfSourceHttp(width, height);
+        attribs.src = mediaFromMxc(src).getThumbnailOfSourceHttp(width, height)!;
         return { tagName, attribs };
     },
     "code": function (tagName: string, attribs: sanitizeHtml.Attributes) {
@@ -359,13 +333,13 @@ const topicSanitizeHtmlParams: IExtendedSanitizeOptions = {
 };
 
 abstract class BaseHighlighter<T extends React.ReactNode> {
-    public constructor(public highlightClass: string, public highlightLink: string) {}
+    public constructor(public highlightClass: string, public highlightLink?: string) {}
 
     /**
-     * apply the highlights to a section of text
+     * Apply the highlights to a section of text
      *
      * @param {string} safeSnippet The snippet of text to apply the highlights
-     *     to.
+     *     to. This input must be sanitised as it will be treated as HTML.
      * @param {string[]} safeHighlights A list of substrings to highlight,
      *     sorted by descending length.
      *
@@ -374,7 +348,7 @@ abstract class BaseHighlighter<T extends React.ReactNode> {
      */
     public applyHighlights(safeSnippet: string, safeHighlights: string[]): T[] {
         let lastOffset = 0;
-        let offset;
+        let offset: number;
         let nodes: T[] = [];
 
         const safeHighlight = safeHighlights[0];
@@ -447,7 +421,7 @@ interface IOpts {
 }
 
 export interface IOptsReturnNode extends IOpts {
-    returnString: false | undefined;
+    returnString?: false | undefined;
 }
 
 export interface IOptsReturnString extends IOpts {
@@ -470,14 +444,18 @@ const emojiToJsxSpan = (emoji: string, key: number): JSX.Element => (
  * @returns if isHtmlMessage is true, returns an array of strings, otherwise return an array of React Elements for emojis
  * and plain text for everything else
  */
-function formatEmojis(message: string, isHtmlMessage: boolean): (JSX.Element | string)[] {
+export function formatEmojis(message: string | undefined, isHtmlMessage?: false): JSX.Element[];
+export function formatEmojis(message: string | undefined, isHtmlMessage: true): string[];
+export function formatEmojis(message: string | undefined, isHtmlMessage?: boolean): (JSX.Element | string)[] {
     const emojiToSpan = isHtmlMessage ? emojiToHtmlSpan : emojiToJsxSpan;
     const result: (JSX.Element | string)[] = [];
+    if (!message) return result;
+
     let text = "";
     let key = 0;
 
-    // We use lodash's grapheme splitter to avoid breaking apart compound emojis
-    for (const char of split(message, "")) {
+    const splitter = new GraphemeSplitter();
+    for (const char of splitter.iterateGraphemes(message)) {
         if (EMOJIBASE_REGEX.test(char)) {
             if (text) {
                 result.push(text);
@@ -511,7 +489,7 @@ function formatEmojis(message: string, isHtmlMessage: boolean): (JSX.Element | s
 export function bodyToHtml(content: IContent, highlights: Optional<string[]>, opts: IOptsReturnString): string;
 export function bodyToHtml(content: IContent, highlights: Optional<string[]>, opts: IOptsReturnNode): ReactNode;
 export function bodyToHtml(content: IContent, highlights: Optional<string[]>, opts: IOpts = {}): ReactNode | string {
-    const isFormattedBody = content.format === "org.matrix.custom.html" && !!content.formatted_body;
+    const isFormattedBody = content.format === "org.matrix.custom.html" && typeof content.formatted_body === "string";
     let bodyHasEmoji = false;
     let isHtmlMessage = false;
 
@@ -521,7 +499,7 @@ export function bodyToHtml(content: IContent, highlights: Optional<string[]>, op
     }
 
     let strippedBody: string;
-    let safeBody: string; // safe, sanitised HTML, preferred over `strippedBody` which is fully plaintext
+    let safeBody: string | undefined; // safe, sanitised HTML, preferred over `strippedBody` which is fully plaintext
 
     try {
         // sanitizeHtml can hang if an unclosed HTML tag is thrown at it
@@ -536,7 +514,7 @@ export function bodyToHtml(content: IContent, highlights: Optional<string[]>, op
 
         if (opts.stripReplyFallback && formattedBody) formattedBody = stripHTMLReply(formattedBody);
         strippedBody = opts.stripReplyFallback ? stripPlainReply(plainBody) : plainBody;
-        bodyHasEmoji = mightContainEmoji(isFormattedBody ? formattedBody : plainBody);
+        bodyHasEmoji = mightContainEmoji(isFormattedBody ? formattedBody! : plainBody);
 
         const highlighter = safeHighlights?.length
             ? new HtmlHighlighter("mx_EventTile_searchHighlight", opts.highlightLink)
@@ -550,50 +528,35 @@ export function bodyToHtml(content: IContent, highlights: Optional<string[]>, op
                 // by an attempt to search for 'foobar'.  Then again, the search query probably wouldn't work either
                 // XXX: hacky bodge to temporarily apply a textFilter to the sanitizeParams structure.
                 sanitizeParams.textFilter = function (safeText) {
-                    return highlighter.applyHighlights(safeText, safeHighlights).join("");
+                    return highlighter.applyHighlights(safeText, safeHighlights!).join("");
                 };
             }
 
-            safeBody = sanitizeHtml(formattedBody, sanitizeParams);
-            const phtml = cheerio.load(safeBody, {
-                // @ts-ignore: The `_useHtmlParser2` internal option is the
-                // simplest way to both parse and render using `htmlparser2`.
-                _useHtmlParser2: true,
-                decodeEntities: false,
-            });
-            const isPlainText = phtml.html() === phtml.root().text();
+            safeBody = sanitizeHtml(formattedBody!, sanitizeParams);
+            const phtml = new DOMParser().parseFromString(safeBody, "text/html");
+            const isPlainText = phtml.body.innerHTML === phtml.body.textContent;
             isHtmlMessage = !isPlainText;
 
             if (isHtmlMessage && SettingsStore.getValue("feature_latex_maths")) {
-                // @ts-ignore - The types for `replaceWith` wrongly expect
-                // Cheerio instance to be returned.
-                phtml('div, span[data-mx-maths!=""]').replaceWith(function (i, e) {
-                    return katex.renderToString(decode(phtml(e).attr("data-mx-maths")), {
+                [...phtml.querySelectorAll<HTMLElement>("div, span[data-mx-maths]")].forEach((e) => {
+                    e.outerHTML = katex.renderToString(decode(e.getAttribute("data-mx-maths")), {
                         throwOnError: false,
-                        // @ts-ignore - `e` can be an Element, not just a Node
-                        displayMode: e.name == "div",
+                        displayMode: e.tagName == "DIV",
                         output: "htmlAndMathml",
                     });
                 });
-                safeBody = phtml.html();
-            }
-            if (bodyHasEmoji) {
-                safeBody = formatEmojis(safeBody, true).join("");
+                safeBody = phtml.body.innerHTML;
             }
         } else if (highlighter) {
-            safeBody = highlighter.applyHighlights(plainBody, safeHighlights).join("");
+            safeBody = highlighter.applyHighlights(escapeHtml(plainBody), safeHighlights!).join("");
         }
     } finally {
         delete sanitizeParams.textFilter;
     }
 
-    const contentBody = safeBody ?? strippedBody;
-    if (opts.returnString) {
-        return contentBody;
-    }
-
     let emojiBody = false;
     if (!opts.disableBigEmoji && bodyHasEmoji) {
+        const contentBody = safeBody ?? strippedBody;
         let contentBodyTrimmed = contentBody !== undefined ? contentBody.trim() : "";
 
         // Remove zero width joiner, zero width spaces and other spaces in body
@@ -604,9 +567,7 @@ export function bodyToHtml(content: IContent, highlights: Optional<string[]>, op
 
         const match = BIGEMOJI_REGEX.exec(contentBodyTrimmed);
         emojiBody =
-            match &&
-            match[0] &&
-            match[0].length === contentBodyTrimmed.length &&
+            match?.[0]?.length === contentBodyTrimmed.length &&
             // Prevent user pills expanding for users with only emoji in
             // their username. Permalinks (links in pills) can be any URL
             // now, so we just check for an HTTP-looking thing.
@@ -615,13 +576,22 @@ export function bodyToHtml(content: IContent, highlights: Optional<string[]>, op
                 (!content.formatted_body.includes("http:") && !content.formatted_body.includes("https:")));
     }
 
+    if (isFormattedBody && bodyHasEmoji && safeBody) {
+        // This has to be done after the emojiBody check above as to not break big emoji on replies
+        safeBody = formatEmojis(safeBody, true).join("");
+    }
+
+    if (opts.returnString) {
+        return safeBody ?? strippedBody;
+    }
+
     const className = classNames({
         "mx_EventTile_body": true,
         "mx_EventTile_bigEmoji": emojiBody,
         "markdown-body": isHtmlMessage && !emojiBody,
     });
 
-    let emojiBodyElements: JSX.Element[];
+    let emojiBodyElements: JSX.Element[] | undefined;
     if (!safeBody && bodyHasEmoji) {
         emojiBodyElements = formatEmojis(strippedBody, false) as JSX.Element[];
     }
@@ -650,13 +620,13 @@ export function bodyToHtml(content: IContent, highlights: Optional<string[]>, op
  * @return The HTML-ified node.
  */
 export function topicToHtml(
-    topic: string,
+    topic?: string,
     htmlTopic?: string,
-    ref?: React.Ref<HTMLSpanElement>,
+    ref?: LegacyRef<HTMLSpanElement>,
     allowExtendedHtml = false,
 ): ReactNode {
     if (!SettingsStore.getValue("feature_html_topic")) {
-        htmlTopic = null;
+        htmlTopic = undefined;
     }
 
     let isFormattedTopic = !!htmlTopic;
@@ -664,10 +634,10 @@ export function topicToHtml(
     let safeTopic = "";
 
     try {
-        topicHasEmoji = mightContainEmoji(isFormattedTopic ? htmlTopic : topic);
+        topicHasEmoji = mightContainEmoji(isFormattedTopic ? htmlTopic! : topic);
 
         if (isFormattedTopic) {
-            safeTopic = sanitizeHtml(htmlTopic, allowExtendedHtml ? sanitizeHtmlParams : topicSanitizeHtmlParams);
+            safeTopic = sanitizeHtml(htmlTopic!, allowExtendedHtml ? sanitizeHtmlParams : topicSanitizeHtmlParams);
             if (topicHasEmoji) {
                 safeTopic = formatEmojis(safeTopic, true).join("");
             }
@@ -676,7 +646,7 @@ export function topicToHtml(
         isFormattedTopic = false; // Fall back to plain-text topic
     }
 
-    let emojiBodyElements: ReturnType<typeof formatEmojis>;
+    let emojiBodyElements: JSX.Element[] | undefined;
     if (!isFormattedTopic && topicHasEmoji) {
         emojiBodyElements = formatEmojis(topic, false);
     }

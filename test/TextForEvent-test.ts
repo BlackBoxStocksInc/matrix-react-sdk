@@ -14,8 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, MatrixClient, MatrixEvent, Room, RoomMember } from "matrix-js-sdk/src/matrix";
-import TestRenderer from "react-test-renderer";
+import {
+    EventType,
+    HistoryVisibility,
+    JoinRule,
+    MatrixClient,
+    MatrixEvent,
+    Room,
+    RoomMember,
+} from "matrix-js-sdk/src/matrix";
+import { render } from "@testing-library/react";
 import { ReactElement } from "react";
 import { Mocked, mocked } from "jest-mock";
 
@@ -46,44 +54,9 @@ function mockPinnedEvent(pinnedMessageIds?: string[], prevPinnedMessageIds?: str
     });
 }
 
-// Helper function that renders a component to a plain text string.
-// Once snapshots are introduced in tests, this function will no longer be necessary,
-// and should be replaced with snapshots.
-function renderComponent(component: TestRenderer.ReactTestRenderer): string {
-    const serializeObject = (
-        object:
-            | TestRenderer.ReactTestRendererJSON
-            | TestRenderer.ReactTestRendererJSON[]
-            | TestRenderer.ReactTestRendererNode
-            | TestRenderer.ReactTestRendererNode[],
-    ): string => {
-        if (typeof object === "string") {
-            return object === " " ? "" : object;
-        }
-
-        if (Array.isArray(object) && object.length === 1 && typeof object[0] === "string") {
-            return object[0];
-        }
-
-        if (!Array.isArray(object) && object["type"] !== undefined && typeof object["children"] !== undefined) {
-            return serializeObject(object.children);
-        }
-
-        if (!Array.isArray(object)) {
-            return "";
-        }
-
-        return object
-            .map((child) => {
-                return serializeObject(child);
-            })
-            .join("");
-    };
-
-    return serializeObject(component.toJSON());
-}
-
 describe("TextForEvent", () => {
+    const mockClient = createTestClient();
+
     describe("getSenderName()", () => {
         it("Prefers sender.name", () => {
             expect(getSenderName({ sender: { name: "Alice" } } as MatrixEvent)).toBe("Alice");
@@ -104,72 +77,72 @@ describe("TextForEvent", () => {
 
         it("mentions message when a single message was pinned, with no previously pinned messages", () => {
             const event = mockPinnedEvent(["message-1"]);
-            const plainText = textForEvent(event);
-            const component = TestRenderer.create(textForEvent(event, true) as ReactElement);
+            const plainText = textForEvent(event, mockClient);
+            const component = render(textForEvent(event, mockClient, true) as ReactElement);
 
             const expectedText = "@foo:example.com pinned a message to this room. See all pinned messages.";
             expect(plainText).toBe(expectedText);
-            expect(renderComponent(component)).toBe(expectedText);
+            expect(component.container).toHaveTextContent(expectedText);
         });
 
         it("mentions message when a single message was pinned, with multiple previously pinned messages", () => {
             const event = mockPinnedEvent(["message-1", "message-2", "message-3"], ["message-1", "message-2"]);
-            const plainText = textForEvent(event);
-            const component = TestRenderer.create(textForEvent(event, true) as ReactElement);
+            const plainText = textForEvent(event, mockClient);
+            const component = render(textForEvent(event, mockClient, true) as ReactElement);
 
             const expectedText = "@foo:example.com pinned a message to this room. See all pinned messages.";
             expect(plainText).toBe(expectedText);
-            expect(renderComponent(component)).toBe(expectedText);
+            expect(component.container).toHaveTextContent(expectedText);
         });
 
         it("mentions message when a single message was unpinned, with a single message previously pinned", () => {
             const event = mockPinnedEvent([], ["message-1"]);
-            const plainText = textForEvent(event);
-            const component = TestRenderer.create(textForEvent(event, true) as ReactElement);
+            const plainText = textForEvent(event, mockClient);
+            const component = render(textForEvent(event, mockClient, true) as ReactElement);
 
             const expectedText = "@foo:example.com unpinned a message from this room. See all pinned messages.";
             expect(plainText).toBe(expectedText);
-            expect(renderComponent(component)).toBe(expectedText);
+            expect(component.container).toHaveTextContent(expectedText);
         });
 
         it("mentions message when a single message was unpinned, with multiple previously pinned messages", () => {
             const event = mockPinnedEvent(["message-2"], ["message-1", "message-2"]);
-            const plainText = textForEvent(event);
-            const component = TestRenderer.create(textForEvent(event, true) as ReactElement);
+            const plainText = textForEvent(event, mockClient);
+            const component = render(textForEvent(event, mockClient, true) as ReactElement);
 
             const expectedText = "@foo:example.com unpinned a message from this room. See all pinned messages.";
             expect(plainText).toBe(expectedText);
-            expect(renderComponent(component)).toBe(expectedText);
+            expect(component.container).toHaveTextContent(expectedText);
         });
 
         it("shows generic text when multiple messages were pinned", () => {
             const event = mockPinnedEvent(["message-1", "message-2", "message-3"], ["message-1"]);
-            const plainText = textForEvent(event);
-            const component = TestRenderer.create(textForEvent(event, true) as ReactElement);
+            const plainText = textForEvent(event, mockClient);
+            const component = render(textForEvent(event, mockClient, true) as ReactElement);
 
             const expectedText = "@foo:example.com changed the pinned messages for the room.";
             expect(plainText).toBe(expectedText);
-            expect(renderComponent(component)).toBe(expectedText);
+            expect(component.container).toHaveTextContent(expectedText);
         });
 
         it("shows generic text when multiple messages were unpinned", () => {
             const event = mockPinnedEvent(["message-3"], ["message-1", "message-2", "message-3"]);
-            const plainText = textForEvent(event);
-            const component = TestRenderer.create(textForEvent(event, true) as ReactElement);
+            const plainText = textForEvent(event, mockClient);
+            const component = render(textForEvent(event, mockClient, true) as ReactElement);
 
             const expectedText = "@foo:example.com changed the pinned messages for the room.";
             expect(plainText).toBe(expectedText);
-            expect(renderComponent(component)).toBe(expectedText);
+            expect(component.container).toHaveTextContent(expectedText);
         });
 
         it("shows generic text when one message was pinned, and another unpinned", () => {
             const event = mockPinnedEvent(["message-2"], ["message-1"]);
-            const plainText = textForEvent(event);
-            const component = TestRenderer.create(textForEvent(event, true) as ReactElement);
+            const plainText = textForEvent(event, mockClient);
+            const component = render(textForEvent(event, mockClient, true) as ReactElement);
 
             const expectedText = "@foo:example.com changed the pinned messages for the room.";
             expect(plainText).toBe(expectedText);
-            expect(renderComponent(component)).toBe(expectedText);
+            expect(component.container).toHaveTextContent(expectedText);
         });
     });
 
@@ -219,12 +192,13 @@ describe("TextForEvent", () => {
         };
 
         beforeAll(() => {
-            mockClient = createTestClient();
+            mockClient = createTestClient() as Mocked<MatrixClient>;
             MatrixClientPeg.get = () => mockClient;
+            MatrixClientPeg.safeGet = () => mockClient;
             mockClient.getRoom.mockClear().mockReturnValue(mockRoom);
             mockRoom.getMember
                 .mockClear()
-                .mockImplementation((userId) => [userA, userB, userC].find((u) => u.userId === userId));
+                .mockImplementation((userId) => [userA, userB, userC].find((u) => u.userId === userId) || null);
             (SettingsStore.getValue as jest.Mock).mockReturnValue(true);
         });
 
@@ -243,7 +217,7 @@ describe("TextForEvent", () => {
                     [userA.userId]: 100,
                 },
             });
-            expect(textForEvent(event)).toBeFalsy();
+            expect(textForEvent(event, mockClient)).toBeFalsy();
         });
 
         it("returns false when users power levels have been changed by default settings", () => {
@@ -257,7 +231,7 @@ describe("TextForEvent", () => {
                     [userA.userId]: 50,
                 },
             });
-            expect(textForEvent(event)).toBeFalsy();
+            expect(textForEvent(event, mockClient)).toBeFalsy();
         });
 
         it("returns correct message for a single user with changed power level", () => {
@@ -270,7 +244,7 @@ describe("TextForEvent", () => {
                 },
             });
             const expectedText = "Alice changed the power level of Bob (@b) from Moderator to Admin.";
-            expect(textForEvent(event)).toEqual(expectedText);
+            expect(textForEvent(event, mockClient)).toEqual(expectedText);
         });
 
         it("returns correct message for a single user with power level changed to the default", () => {
@@ -285,7 +259,7 @@ describe("TextForEvent", () => {
                 },
             });
             const expectedText = "Alice changed the power level of Bob (@b) from Moderator to Default.";
-            expect(textForEvent(event)).toEqual(expectedText);
+            expect(textForEvent(event, mockClient)).toEqual(expectedText);
         });
 
         it("returns correct message for a single user with power level changed to a custom level", () => {
@@ -298,7 +272,7 @@ describe("TextForEvent", () => {
                 },
             });
             const expectedText = "Alice changed the power level of Bob (@b) from Moderator to Custom (-1).";
-            expect(textForEvent(event)).toEqual(expectedText);
+            expect(textForEvent(event, mockClient)).toEqual(expectedText);
         });
 
         it("returns correct message for a multiple power level changes", () => {
@@ -315,7 +289,7 @@ describe("TextForEvent", () => {
             const expectedText =
                 "Alice changed the power level of Bob (@b) from Moderator to Admin," +
                 " Bob (@c) from Custom (101) to Moderator.";
-            expect(textForEvent(event)).toEqual(expectedText);
+            expect(textForEvent(event, mockClient)).toEqual(expectedText);
         });
     });
 
@@ -419,7 +393,7 @@ describe("TextForEvent", () => {
 
         it.each(testCases)("returns correct message when %s", (_d, { result, ...eventProps }) => {
             const event = mockEvent(eventProps);
-            expect(textForEvent(event)).toEqual(result);
+            expect(textForEvent(event, mockClient)).toEqual(result);
         });
     });
 
@@ -446,11 +420,11 @@ describe("TextForEvent", () => {
         it("returns correct message for redacted poll start", () => {
             pollEvent.makeRedacted(pollEvent);
 
-            expect(textForEvent(pollEvent)).toEqual("@a: Message deleted");
+            expect(textForEvent(pollEvent, mockClient)).toEqual("@a: Message deleted");
         });
 
         it("returns correct message for normal poll start", () => {
-            expect(textForEvent(pollEvent)).toEqual("@a has started a poll - ");
+            expect(textForEvent(pollEvent, mockClient)).toEqual("@a has started a poll - ");
         });
     });
 
@@ -472,11 +446,11 @@ describe("TextForEvent", () => {
         it("returns correct message for redacted message", () => {
             messageEvent.makeRedacted(messageEvent);
 
-            expect(textForEvent(messageEvent)).toEqual("@a: Message deleted");
+            expect(textForEvent(messageEvent, mockClient)).toEqual("@a: Message deleted");
         });
 
         it("returns correct message for normal message", () => {
-            expect(textForEvent(messageEvent)).toEqual("@a: test message");
+            expect(textForEvent(messageEvent, mockClient)).toEqual("@a: test message");
         });
     });
 
@@ -486,7 +460,7 @@ describe("TextForEvent", () => {
 
         beforeEach(() => {
             stubClient();
-            mockClient = MatrixClientPeg.get();
+            mockClient = MatrixClientPeg.safeGet();
 
             mocked(mockClient.getRoom).mockReturnValue({
                 name: "Test room",
@@ -505,16 +479,139 @@ describe("TextForEvent", () => {
             });
 
             it("returns correct message for call event when supported", () => {
-                expect(textForEvent(callEvent)).toEqual("Video call started in Test room.");
+                expect(textForEvent(callEvent, mockClient)).toEqual("Video call started in Test room.");
             });
 
-            it("returns correct message for call event when supported", () => {
+            it("returns correct message for call event when not supported", () => {
                 mocked(mockClient).supportsVoip.mockReturnValue(false);
 
-                expect(textForEvent(callEvent)).toEqual(
+                expect(textForEvent(callEvent, mockClient)).toEqual(
                     "Video call started in Test room. (not supported by this browser)",
                 );
             });
         });
+    });
+
+    describe("textForMemberEvent()", () => {
+        beforeEach(() => {
+            stubClient();
+        });
+
+        it("should handle both displayname and avatar changing in one event", () => {
+            expect(
+                textForEvent(
+                    new MatrixEvent({
+                        type: "m.room.member",
+                        sender: "@a:foo",
+                        content: {
+                            membership: "join",
+                            avatar_url: "b",
+                            displayname: "Bob",
+                        },
+                        prev_content: {
+                            membership: "join",
+                            avatar_url: "a",
+                            displayname: "Andy",
+                        },
+                        state_key: "@a:foo",
+                    }),
+                    mockClient,
+                ),
+            ).toMatchInlineSnapshot(`"Andy changed their display name and profile picture"`);
+        });
+    });
+
+    describe("textForJoinRulesEvent()", () => {
+        type TestCase = [string, { result: string }];
+        const testCases: TestCase[] = [
+            [JoinRule.Public, { result: "@a made the room public to whoever knows the link." }],
+            [JoinRule.Invite, { result: "@a made the room invite only." }],
+            [JoinRule.Knock, { result: "@a changed the join rule to ask to join." }],
+            [JoinRule.Restricted, { result: "@a changed who can join this room." }],
+        ];
+
+        it.each(testCases)("returns correct message when room join rule changed to %s", (joinRule, { result }) => {
+            expect(
+                textForEvent(
+                    new MatrixEvent({
+                        type: "m.room.join_rules",
+                        sender: "@a",
+                        content: {
+                            join_rule: joinRule,
+                        },
+                        state_key: "",
+                    }),
+                    mockClient,
+                ),
+            ).toEqual(result);
+        });
+
+        it(`returns correct JSX message when room join rule changed to ${JoinRule.Restricted}`, () => {
+            expect(
+                textForEvent(
+                    new MatrixEvent({
+                        type: "m.room.join_rules",
+                        sender: "@a",
+                        content: {
+                            join_rule: JoinRule.Restricted,
+                        },
+                        state_key: "",
+                    }),
+                    mockClient,
+                    true,
+                ),
+            ).toMatchSnapshot();
+        });
+
+        it("returns correct default message", () => {
+            expect(
+                textForEvent(
+                    new MatrixEvent({
+                        type: "m.room.join_rules",
+                        sender: "@a",
+                        content: {
+                            join_rule: "a not implemented one",
+                        },
+                        state_key: "",
+                    }),
+                    mockClient,
+                ),
+            ).toEqual("@a changed the join rule to a not implemented one");
+        });
+    });
+
+    describe("textForHistoryVisibilityEvent()", () => {
+        type TestCase = [string, { result: string }];
+        const testCases: TestCase[] = [
+            [
+                HistoryVisibility.Invited,
+                { result: "@a made future room history visible to all room members, from the point they are invited." },
+            ],
+            [
+                HistoryVisibility.Joined,
+                { result: "@a made future room history visible to all room members, from the point they joined." },
+            ],
+            [HistoryVisibility.Shared, { result: "@a made future room history visible to all room members." }],
+            [HistoryVisibility.WorldReadable, { result: "@a made future room history visible to anyone." }],
+        ];
+
+        it.each(testCases)(
+            "returns correct message when room join rule changed to %s",
+            (historyVisibility, { result }) => {
+                expect(
+                    textForEvent(
+                        new MatrixEvent({
+                            type: "m.room.history_visibility",
+                            sender: "@a",
+                            content: {
+                                history_visibility: historyVisibility,
+                            },
+                            state_key: "",
+                        }),
+                        mockClient,
+                    ),
+                ).toEqual(result);
+            },
+        );
     });
 });

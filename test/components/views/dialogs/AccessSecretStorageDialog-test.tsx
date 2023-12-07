@@ -30,9 +30,9 @@ describe("AccessSecretStorageDialog", () => {
     let mockClient: Mocked<MatrixClient>;
 
     const defaultProps: ComponentProps<typeof AccessSecretStorageDialog> = {
+        keyInfo: {} as any,
         onFinished: jest.fn(),
         checkPrivateKey: jest.fn(),
-        keyInfo: undefined,
     };
 
     const renderComponent = (props = {}): void => {
@@ -135,5 +135,7 @@ describe("AccessSecretStorageDialog", () => {
                 "👎 Unable to access secret storage. Please verify that you entered the correct Security Phrase.",
             ),
         ).toBeInTheDocument();
+
+        expect(screen.getByPlaceholderText("Security Phrase")).toHaveFocus();
     });
 });

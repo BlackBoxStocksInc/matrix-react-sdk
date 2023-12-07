@@ -16,7 +16,7 @@ limitations under the License.
 
 import React, { ComponentProps } from "react";
 import { fireEvent, render } from "@testing-library/react";
-import { PUSHER_ENABLED } from "matrix-js-sdk/src/@types/event";
+import { PUSHER_ENABLED } from "matrix-js-sdk/src/matrix";
 
 import DeviceDetails from "../../../../../src/components/views/settings/devices/DeviceDetails";
 import { mkPusher } from "../../../../test-utils/test-utils";
@@ -30,7 +30,6 @@ describe("<DeviceDetails />", () => {
     };
     const defaultProps: ComponentProps<typeof DeviceDetails> = {
         device: baseDevice,
-        pusher: null,
         isSigningOut: false,
         onSignOutDevice: jest.fn(),
         saveDeviceName: jest.fn(),

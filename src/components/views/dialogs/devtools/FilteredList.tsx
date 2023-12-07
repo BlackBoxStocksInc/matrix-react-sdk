@@ -1,5 +1,6 @@
 /*
 Copyright 2022 Michael Telatynski <7t3chguy@gmail.com>
+Copyright 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +38,7 @@ const FilteredList: React.FC<IProps> = ({ children, query, onChange }) => {
         let filteredChildren = children;
         if (query) {
             const lcQuery = query.toLowerCase();
-            filteredChildren = children.filter((child) => child.key.toString().toLowerCase().includes(lcQuery));
+            filteredChildren = children.filter((child) => child.key?.toString().toLowerCase().includes(lcQuery));
         }
         setFilteredChildren(filteredChildren);
         setTruncateAt(INITIAL_LOAD_TILES);
@@ -58,7 +59,7 @@ const FilteredList: React.FC<IProps> = ({ children, query, onChange }) => {
 
         return (
             <button className="mx_DevTools_button" onClick={showMore}>
-                {_t("and %(count)s others...", { count: overflowCount })}
+                {_t("common|and_n_others", { count: overflowCount })}
             </button>
         );
     };
@@ -66,7 +67,7 @@ const FilteredList: React.FC<IProps> = ({ children, query, onChange }) => {
     return (
         <>
             <Field
-                label={_t("Filter results")}
+                label={_t("common|filter_results")}
                 autoFocus={true}
                 size={64}
                 type="text"
@@ -79,7 +80,7 @@ const FilteredList: React.FC<IProps> = ({ children, query, onChange }) => {
             />
 
             {filteredChildren.length < 1 ? (
-                _t("No results found")
+                _t("common|no_results_found")
             ) : (
                 <TruncatedList
                     getChildren={getChildren}

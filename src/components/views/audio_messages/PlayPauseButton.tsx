@@ -60,9 +60,9 @@ export default class PlayPauseButton extends React.PureComponent<IProps> {
 
         return (
             <AccessibleTooltipButton
-                data-test-id="play-pause-button"
+                data-testid="play-pause-button"
                 className={classes}
-                title={isPlaying ? _t("Pause") : _t("Play")}
+                title={isPlaying ? _t("action|pause") : _t("action|play")}
                 onClick={this.onClick}
                 disabled={isDisabled}
                 {...restProps}

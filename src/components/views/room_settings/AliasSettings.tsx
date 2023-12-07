@@ -1,5 +1,5 @@
 /*
-Copyright 2016 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2016 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,9 +15,8 @@ limitations under the License.
 */
 
 import React, { ChangeEvent, ContextType, createRef, SyntheticEvent } from "react";
-import { IContent, MatrixEvent } from "matrix-js-sdk/src/models/event";
+import { IContent, MatrixEvent, EventType } from "matrix-js-sdk/src/matrix";
 import { logger } from "matrix-js-sdk/src/logger";
-import { EventType } from "matrix-js-sdk/src/@types/event";
 
 import EditableItemList from "../elements/EditableItemList";
 import { _t } from "../../../languageHandler";
@@ -41,6 +40,8 @@ class EditableAliasesList extends EditableItemList<IEditableAliasesListProps> {
 
     private onAliasAdded = async (ev: SyntheticEvent): Promise<void> => {
         ev.preventDefault();
+
+        if (!this.aliasField.current) return;
         await this.aliasField.current.validate({ allowEmpty: false });
 
         if (this.aliasField.current.isValid) {
@@ -69,7 +70,7 @@ class EditableAliasesList extends EditableItemList<IEditableAliasesListProps> {
                     roomId={this.props.roomId}
                 />
                 <AccessibleButton onClick={this.onAliasAdded} kind="primary">
-                    {_t("Add")}
+                    {_t("action|add")}
                 </AccessibleButton>
             </form>
         );
@@ -85,9 +86,12 @@ interface IProps {
 }
 
 interface IState {
+    // [ #alias:domain.tld, ... ]
     altAliases: string[];
+    // [ #alias:my-hs.tld, ... ]
     localAliases: string[];
-    canonicalAlias?: string;
+    // #canonical:domain.tld
+    canonicalAlias: string | null;
     updatingCanonicalAlias: boolean;
     localAliasesLoading: boolean;
     detailsOpen: boolean;
@@ -97,7 +101,7 @@ interface IState {
 
 export default class AliasSettings extends React.Component<IProps, IState> {
     public static contextType = MatrixClientContext;
-    public context: ContextType<typeof MatrixClientContext>;
+    public context!: ContextType<typeof MatrixClientContext>;
 
     public static defaultProps = {
         canSetAliases: false,
@@ -108,9 +112,9 @@ export default class AliasSettings extends React.Component<IProps, IState> {
         super(props, context);
 
         const state: IState = {
-            altAliases: [], // [ #alias:domain.tld, ... ]
-            localAliases: [], // [ #alias:my-hs.tld, ... ]
-            canonicalAlias: null, // #canonical:domain.tld
+            altAliases: [],
+            localAliases: [],
+            canonicalAlias: null,
             updatingCanonicalAlias: false,
             localAliasesLoading: false,
             detailsOpen: false,
@@ -156,7 +160,7 @@ export default class AliasSettings extends React.Component<IProps, IState> {
         }
     }
 
-    private changeCanonicalAlias(alias: string): void {
+    private changeCanonicalAlias(alias: string | null): void {
         if (!this.props.canSetCanonicalAlias) return;
 
         const oldAlias = this.state.canonicalAlias;
@@ -176,11 +180,8 @@ export default class AliasSettings extends React.Component<IProps, IState> {
             .catch((err) => {
                 logger.error(err);
                 Modal.createDialog(ErrorDialog, {
-                    title: _t("Error updating main address"),
-                    description: _t(
-                        "There was an error updating the room's main address. It may not be allowed by the server " +
-                            "or a temporary failure occurred.",
-                    ),
+                    title: _t("room_settings|general|error_updating_canonical_alias_title"),
+                    description: _t("room_settings|general|error_updating_canonical_alias_description"),
                 });
                 this.setState({ canonicalAlias: oldAlias });
             })
@@ -216,11 +217,8 @@ export default class AliasSettings extends React.Component<IProps, IState> {
                 // TODO: Add error handling based upon server validation
                 logger.error(err);
                 Modal.createDialog(ErrorDialog, {
-                    title: _t("Error updating main address"),
-                    description: _t(
-                        "There was an error updating the room's alternative addresses. " +
-                            "It may not be allowed by the server or a temporary failure occurred.",
-                    ),
+                    title: _t("room_settings|general|error_updating_canonical_alias_title"),
+                    description: _t("room_settings|general|error_updating_alias_description"),
                 });
             })
             .finally(() => {
@@ -232,7 +230,7 @@ export default class AliasSettings extends React.Component<IProps, IState> {
         this.setState({ newAlias: value });
     };
 
-    private onLocalAliasAdded = (alias: string): void => {
+    private onLocalAliasAdded = (alias?: string): void => {
         if (!alias || alias.length === 0) return; // ignore attempts to create blank aliases
 
         const localDomain = this.context.getDomain();
@@ -242,21 +240,18 @@ export default class AliasSettings extends React.Component<IProps, IState> {
             .createAlias(alias, this.props.roomId)
             .then(() => {
                 this.setState({
-                    localAliases: this.state.localAliases.concat(alias),
-                    newAlias: null,
+                    localAliases: this.state.localAliases.concat(alias!),
+                    newAlias: undefined,
                 });
                 if (!this.state.canonicalAlias) {
-                    this.changeCanonicalAlias(alias);
+                    this.changeCanonicalAlias(alias!);
                 }
             })
             .catch((err) => {
                 logger.error(err);
                 Modal.createDialog(ErrorDialog, {
-                    title: _t("Error creating address"),
-                    description: _t(
-                        "There was an error creating that address. It may not be allowed by the server " +
-                            "or a temporary failure occurred.",
-                    ),
+                    title: _t("room_settings|general|error_creating_alias_title"),
+                    description: _t("room_settings|general|error_creating_alias_description"),
                 });
             });
     };
@@ -279,15 +274,12 @@ export default class AliasSettings extends React.Component<IProps, IState> {
                 logger.error(err);
                 let description;
                 if (err.errcode === "M_FORBIDDEN") {
-                    description = _t("You don't have permission to delete the address.");
+                    description = _t("room_settings|general|error_deleting_alias_description_forbidden");
                 } else {
-                    description = _t(
-                        "There was an error removing that address. It may no longer exist or a temporary " +
-                            "error occurred.",
-                    );
+                    description = _t("room_settings|general|error_deleting_alias_description");
                 }
                 Modal.createDialog(ErrorDialog, {
-                    title: _t("Error removing address"),
+                    title: _t("room_settings|general|error_deleting_alias_title"),
                     description,
                 });
             });
@@ -336,9 +328,9 @@ export default class AliasSettings extends React.Component<IProps, IState> {
         return this.state.localAliases.filter((alias) => !altAliases.includes(alias));
     }
 
-    public render(): JSX.Element {
+    public render(): React.ReactNode {
         const mxClient = this.context;
-        const localDomain = mxClient.getDomain();
+        const localDomain = mxClient.getDomain()!;
         const isSpaceRoom = mxClient.getRoom(this.props.roomId)?.isSpaceRoom();
 
         let found = false;
@@ -350,10 +342,10 @@ export default class AliasSettings extends React.Component<IProps, IState> {
                 disabled={this.state.updatingCanonicalAlias || !this.props.canSetCanonicalAlias}
                 element="select"
                 id="canonicalAlias"
-                label={_t("Main address")}
+                label={_t("room_settings|general|canonical_alias_field_label")}
             >
                 <option value="" key="unset">
-                    {_t("not specified")}
+                    {_t("room_settings|alias_not_specified")}
                 </option>
                 {this.getAliases().map((alias, i) => {
                     if (alias === this.state.canonicalAlias) found = true;
@@ -388,38 +380,31 @@ export default class AliasSettings extends React.Component<IProps, IState> {
                     onItemAdded={this.onLocalAliasAdded}
                     onItemRemoved={this.onLocalAliasDeleted}
                     noItemsLabel={
-                        isSpaceRoom ? _t("This space has no local addresses") : _t("This room has no local addresses")
+                        isSpaceRoom
+                            ? _t("room_settings|general|no_aliases_space")
+                            : _t("room_settings|general|no_aliases_room")
                     }
-                    placeholder={_t("Local address")}
+                    placeholder={_t("room_settings|general|local_alias_field_label")}
                     domain={localDomain}
                 />
             );
         }
 
         return (
-            <div className="mx_AliasSettings">
+            <>
                 <SettingsFieldset
-                    data-test-id="published-address-fieldset"
-                    legend={_t("Published Addresses")}
+                    data-testid="published-address-fieldset"
+                    legend={_t("room_settings|general|published_aliases_section")}
                     description={
                         <>
                             {isSpaceRoom
-                                ? _t("Published addresses can be used by anyone on any server to join your space.")
-                                : _t("Published addresses can be used by anyone on any server to join your room.")}
+                                ? _t("room_settings|general|published_aliases_explainer_space")
+                                : _t("room_settings|general|published_aliases_explainer_room")}
                             &nbsp;
-                            {_t("To publish an address, it needs to be set as a local address first.")}
+                            {_t("room_settings|general|published_aliases_description")}
                         </>
                     }
                 >
-                    {/*
-                <span className='mx_SettingsTab_subheading'>{ _t("Published Addresses") }</span>
-                <p>
-                    { isSpaceRoom
-                        ? _t("Published addresses can be used by anyone on any server to join your space.")
-                        : _t("Published addresses can be used by anyone on any server to join your room.") }
-                    &nbsp;
-                    { _t("To publish an address, it needs to be set as a local address first.") }
-                </p> */}
                     {canonicalAliasSection}
                     {this.props.hidePublishSetting ? null : (
                         <RoomPublishSetting
@@ -443,35 +428,29 @@ export default class AliasSettings extends React.Component<IProps, IState> {
                         onItemAdded={this.onAltAliasAdded}
                         onItemRemoved={this.onAltAliasDeleted}
                         suggestionsListId="mx_AliasSettings_altRecommendations"
-                        itemsLabel={_t("Other published addresses:")}
-                        noItemsLabel={_t("No other published addresses yet, add one below")}
-                        placeholder={_t("New published address (e.g. #alias:server)")}
+                        itemsLabel={_t("room_settings|general|aliases_items_label")}
+                        noItemsLabel={_t("room_settings|general|aliases_no_items_label")}
+                        placeholder={_t("room_settings|general|new_alias_placeholder")}
                         roomId={this.props.roomId}
                     />
                 </SettingsFieldset>
                 <SettingsFieldset
-                    data-test-id="local-address-fieldset"
-                    legend={_t("Local Addresses")}
+                    data-testid="local-address-fieldset"
+                    legend={_t("room_settings|general|local_aliases_section")}
                     description={
                         isSpaceRoom
-                            ? _t(
-                                  "Set addresses for this space so users can find this space " +
-                                      "through your homeserver (%(localDomain)s)",
-                                  { localDomain },
-                              )
-                            : _t(
-                                  "Set addresses for this room so users can find this room " +
-                                      "through your homeserver (%(localDomain)s)",
-                                  { localDomain },
-                              )
+                            ? _t("room_settings|general|local_aliases_explainer_space", { localDomain })
+                            : _t("room_settings|general|local_aliases_explainer_room", { localDomain })
                     }
                 >
                     <details onToggle={this.onLocalAliasesToggled} open={this.state.detailsOpen}>
-                        <summary>{this.state.detailsOpen ? _t("Show less") : _t("Show more")}</summary>
+                        <summary className="mx_AliasSettings_localAddresses">
+                            {this.state.detailsOpen ? _t("room_list|show_less") : _t("common|show_more")}
+                        </summary>
                         {localAliasesList}
                     </details>
                 </SettingsFieldset>
-            </div>
+            </>
         );
     }
 }

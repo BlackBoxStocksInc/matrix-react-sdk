@@ -18,8 +18,9 @@ import React from "react";
 
 import { arraySeed, arrayTrimFill } from "../../../utils/arrays";
 import Waveform from "./Waveform";
-import { Playback, PLAYBACK_WAVEFORM_SAMPLES } from "../../../audio/Playback";
+import { Playback } from "../../../audio/Playback";
 import { percentageOf } from "../../../utils/numbers";
+import { PLAYBACK_WAVEFORM_SAMPLES } from "../../../audio/consts";
 
 interface IProps {
     playback: Playback;
@@ -61,7 +62,7 @@ export default class PlaybackWaveform extends React.PureComponent<IProps, IState
         this.setState({ progress });
     };
 
-    public render(): JSX.Element {
+    public render(): React.ReactNode {
         return <Waveform relHeights={this.state.heights} progress={this.state.progress} />;
     }
 }

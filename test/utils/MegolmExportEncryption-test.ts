@@ -22,7 +22,7 @@ import type * as MegolmExportEncryptionExport from "../../src/utils/MegolmExport
 
 const webCrypto = new Crypto();
 
-function getRandomValues<T extends ArrayBufferView>(buf: T): T {
+function getRandomValues<T extends ArrayBufferView | null>(buf: T): T {
     // @ts-ignore fussy generics
     return nodeCrypto.randomFillSync(buf);
 }
@@ -75,18 +75,14 @@ describe("MegolmExportEncryption", function () {
     let MegolmExportEncryption: typeof MegolmExportEncryptionExport;
 
     beforeEach(() => {
-        window.crypto = {
-            getRandomValues,
-            randomUUID: jest.fn().mockReturnValue("not-random-uuid"),
-            subtle: webCrypto.subtle,
-        };
-        // @ts-ignore for some reason including it in the object above gets ignored
-        window.crypto.subtle = webCrypto.subtle;
+        Object.defineProperty(window, "crypto", {
+            value: {
+                getRandomValues,
+                randomUUID: jest.fn().mockReturnValue("not-random-uuid"),
+                subtle: webCrypto.subtle,
+            },
+        });
         MegolmExportEncryption = require("../../src/utils/MegolmExportEncryption");
-    });
-
-    afterAll(() => {
-        window.crypto = undefined;
     });
 
     describe("decrypt", function () {
@@ -133,7 +129,7 @@ cissyYBxjsfsAn
 
         // TODO find a subtlecrypto shim which doesn't break this test
         it.skip("should decrypt a range of inputs", function () {
-            function next(i: number): unknown {
+            function next(i: number): Promise<string | undefined> | undefined {
                 if (i >= TEST_VECTORS.length) {
                     return;
                 }
@@ -144,7 +140,7 @@ cissyYBxjsfsAn
                     return next(i + 1);
                 });
             }
-            return next(0);
+            next(0);
         });
     });
 

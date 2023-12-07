@@ -56,7 +56,8 @@ class MyClipboardEvent extends Event {}
 window.ClipboardEvent = MyClipboardEvent as any;
 
 // matchMedia is not included in jsdom
-const mockMatchMedia = jest.fn().mockImplementation((query) => ({
+// TODO: Extract this to a function and have tests that need it opt into it.
+const mockMatchMedia = (query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -65,7 +66,7 @@ const mockMatchMedia = jest.fn().mockImplementation((query) => ({
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
     dispatchEvent: jest.fn(),
-}));
+});
 global.matchMedia = mockMatchMedia;
 
 // maplibre requires a createObjectURL mock
@@ -85,16 +86,9 @@ window.HTMLElement.prototype.scrollIntoView = jest.fn();
 fetchMock.config.overwriteRoutes = false;
 fetchMock.catch("");
 fetchMock.get("/image-file-stub", "image file stub");
+fetchMock.get("/_matrix/client/versions", {});
 // @ts-ignore
 window.fetch = fetchMock.sandbox();
 
 // @ts-ignore
 window.Response = Response;
-
-// set up mediaDevices mock
-Object.defineProperty(navigator, "mediaDevices", {
-    value: {
-        enumerateDevices: jest.fn().mockResolvedValue([]),
-        getUserMedia: jest.fn(),
-    },
-});

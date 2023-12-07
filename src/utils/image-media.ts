@@ -15,9 +15,11 @@ limitations under the License.
 */
 
 import { BlurhashEncoder } from "../BlurhashEncoder";
-import { IEncryptedFile } from "../customisations/models/IMediaEventContent";
+import { EncryptedFile } from "../customisations/models/IMediaEventContent";
 
 type ThumbnailableElement = HTMLImageElement | HTMLVideoElement;
+
+export const BLURHASH_FIELD = "xyz.amorgan.blurhash"; // MSC2448
 
 interface IThumbnail {
     info: {
@@ -29,14 +31,12 @@ interface IThumbnail {
         };
         w: number;
         h: number;
-        [BLURHASH_FIELD]: string;
+        [BLURHASH_FIELD]?: string;
         thumbnail_url?: string;
-        thumbnail_file?: IEncryptedFile;
+        thumbnail_file?: EncryptedFile;
     };
     thumbnail: Blob;
 }
-
-export const BLURHASH_FIELD = "xyz.amorgan.blurhash"; // MSC2448
 
 const MAX_WIDTH = 800;
 const MAX_HEIGHT = 600;
@@ -88,7 +88,7 @@ export async function createThumbnail(
         canvas = document.createElement("canvas");
         canvas.width = targetWidth;
         canvas.height = targetHeight;
-        context = canvas.getContext("2d");
+        context = canvas.getContext("2d")!;
     }
 
     context.drawImage(element, 0, 0, targetWidth, targetHeight);
@@ -97,7 +97,9 @@ export async function createThumbnail(
     if (window.OffscreenCanvas && canvas instanceof OffscreenCanvas) {
         thumbnailPromise = canvas.convertToBlob({ type: mimeType });
     } else {
-        thumbnailPromise = new Promise<Blob>((resolve) => (canvas as HTMLCanvasElement).toBlob(resolve, mimeType));
+        thumbnailPromise = new Promise<Blob>((resolve) =>
+            (canvas as HTMLCanvasElement).toBlob(resolve as BlobCallback, mimeType),
+        );
     }
 
     const imageData = context.getImageData(0, 0, targetWidth, targetHeight);

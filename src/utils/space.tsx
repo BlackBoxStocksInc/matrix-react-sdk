@@ -15,15 +15,12 @@ limitations under the License.
 */
 
 import React from "react";
-import { Room } from "matrix-js-sdk/src/models/room";
-import { RoomType, EventType } from "matrix-js-sdk/src/@types/event";
-import { JoinRule } from "matrix-js-sdk/src/@types/partials";
-import { ICreateRoomStateEvent } from "matrix-js-sdk/src/matrix";
+import { Room, ICreateRoomStateEvent, RoomType, EventType, JoinRule } from "matrix-js-sdk/src/matrix";
 
 import { calculateRoomVia } from "./permalinks/Permalinks";
 import Modal from "../Modal";
 import CreateRoomDialog from "../components/views/dialogs/CreateRoomDialog";
-import createRoom, { IOpts } from "../createRoom";
+import createRoom from "../createRoom";
 import { _t } from "../languageHandler";
 import SpacePublicShare from "../components/views/spaces/SpacePublicShare";
 import InfoDialog from "../components/views/dialogs/InfoDialog";
@@ -75,16 +72,16 @@ export const showAddExistingRooms = (space: Room): void => {
 };
 
 export const showCreateNewRoom = async (space: Room, type?: RoomType): Promise<boolean> => {
-    const modal = Modal.createDialog<[boolean, IOpts]>(CreateRoomDialog, {
+    const modal = Modal.createDialog(CreateRoomDialog, {
         type,
         defaultPublic: space.getJoinRule() === JoinRule.Public,
         parentSpace: space,
     });
     const [shouldCreate, opts] = await modal.finished;
     if (shouldCreate) {
-        await createRoom(opts);
+        await createRoom(space.client, opts);
     }
-    return shouldCreate;
+    return !!shouldCreate;
 };
 
 export const shouldShowSpaceInvite = (space: Room): boolean =>
@@ -95,10 +92,10 @@ export const shouldShowSpaceInvite = (space: Room): boolean =>
 export const showSpaceInvite = (space: Room, initialText = ""): void => {
     if (space.getJoinRule() === "public") {
         const modal = Modal.createDialog(InfoDialog, {
-            title: _t("Invite to %(spaceName)s", { spaceName: space.name }),
+            title: _t("invite|to_space", { spaceName: space.name }),
             description: (
                 <React.Fragment>
-                    <span>{_t("Share your public space")}</span>
+                    <span>{_t("space|share_public")}</span>
                     <SpacePublicShare space={space} onFinished={() => modal.close()} />
                 </React.Fragment>
             ),

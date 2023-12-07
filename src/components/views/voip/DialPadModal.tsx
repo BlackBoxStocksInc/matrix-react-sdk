@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, { ChangeEvent } from "react";
-import { createRef, SyntheticEvent } from "react";
+import React, { ChangeEvent, createRef, SyntheticEvent } from "react";
 
 import AccessibleButton, { ButtonEvent } from "../elements/AccessibleButton";
 import Field from "../elements/Field";
@@ -82,7 +81,7 @@ export default class DialpadModal extends React.PureComponent<IProps, IState> {
         this.props.onFinished(true);
     };
 
-    public render(): JSX.Element {
+    public render(): React.ReactNode {
         const backspaceButton = <DialPadBackspaceButton onBackspacePress={this.onDeletePress} />;
 
         // Only show the backspace button if the field has content

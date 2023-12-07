@@ -17,8 +17,17 @@ limitations under the License.
 /// <reference types="cypress" />
 
 import Chainable = Cypress.Chainable;
+import Loggable = Cypress.Loggable;
+import Timeoutable = Cypress.Timeoutable;
+import Withinable = Cypress.Withinable;
+import Shadow = Cypress.Shadow;
 import type { SettingLevel } from "../../src/settings/SettingLevel";
 import type SettingsStore from "../../src/settings/SettingsStore";
+
+export enum Filter {
+    People = "people",
+    PublicRooms = "public_rooms",
+}
 
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -38,6 +47,11 @@ declare global {
              * @param tab the name of the tab to switch to after opening, optional.
              */
             openUserSettings(tab?: string): Chainable<JQuery<HTMLElement>>;
+
+            /**
+             * Open room creation dialog.
+             */
+            openCreateRoomDialog(): Chainable<JQuery<HTMLElement>>;
 
             /**
              * Open room settings (via room header menu), returning a handle to the resulting dialog.
@@ -97,6 +111,26 @@ declare global {
              * @return {*} The value, or null if not found
              */
             getSettingValue<T>(settingName: string, roomId?: string, excludeDefault?: boolean): Chainable<T>;
+
+            /**
+             * Opens the spotlight dialog
+             */
+            openSpotlightDialog(
+                options?: Partial<Loggable & Timeoutable & Withinable & Shadow>,
+            ): Chainable<JQuery<HTMLElement>>;
+            spotlightDialog(
+                options?: Partial<Loggable & Timeoutable & Withinable & Shadow>,
+            ): Chainable<JQuery<HTMLElement>>;
+            spotlightFilter(
+                filter: Filter | null,
+                options?: Partial<Loggable & Timeoutable & Withinable & Shadow>,
+            ): Chainable<JQuery<HTMLElement>>;
+            spotlightSearch(
+                options?: Partial<Loggable & Timeoutable & Withinable & Shadow>,
+            ): Chainable<JQuery<HTMLElement>>;
+            spotlightResults(
+                options?: Partial<Loggable & Timeoutable & Withinable & Shadow>,
+            ): Chainable<JQuery<HTMLElement>>;
         }
     }
 }
@@ -125,13 +159,13 @@ Cypress.Commands.add(
 );
 
 Cypress.Commands.add("openUserMenu", (): Chainable<JQuery<HTMLElement>> => {
-    cy.get('[aria-label="User menu"]').click();
+    cy.findByRole("button", { name: "User menu" }).click();
     return cy.get(".mx_ContextualMenu");
 });
 
 Cypress.Commands.add("openUserSettings", (tab?: string): Chainable<JQuery<HTMLElement>> => {
     cy.openUserMenu().within(() => {
-        cy.get('[aria-label="All settings"]').click();
+        cy.findByRole("menuitem", { name: "All settings" }).click();
     });
     return cy.get(".mx_UserSettingsDialog").within(() => {
         if (tab) {
@@ -140,10 +174,16 @@ Cypress.Commands.add("openUserSettings", (tab?: string): Chainable<JQuery<HTMLEl
     });
 });
 
+Cypress.Commands.add("openCreateRoomDialog", (): Chainable<JQuery<HTMLElement>> => {
+    cy.findByRole("button", { name: "Add room" }).click();
+    cy.findByRole("menuitem", { name: "New room" }).click();
+    return cy.get(".mx_CreateRoomDialog");
+});
+
 Cypress.Commands.add("openRoomSettings", (tab?: string): Chainable<JQuery<HTMLElement>> => {
-    cy.get(".mx_RoomHeader_name").click();
+    cy.findByRole("button", { name: "Room options" }).click();
     cy.get(".mx_RoomTile_contextMenu").within(() => {
-        cy.get('[aria-label="Settings"]').click();
+        cy.findByRole("menuitem", { name: "Settings" }).click();
     });
     return cy.get(".mx_RoomSettingsDialog").within(() => {
         if (tab) {
@@ -159,7 +199,7 @@ Cypress.Commands.add("switchTab", (tab: string): Chainable<JQuery<HTMLElement>> 
 });
 
 Cypress.Commands.add("closeDialog", (): Chainable<JQuery<HTMLElement>> => {
-    return cy.get('[aria-label="Close dialog"]').click();
+    return cy.findByRole("button", { name: "Close dialog" }).click();
 });
 
 Cypress.Commands.add("joinBeta", (name: string): Chainable<JQuery<HTMLElement>> => {
@@ -167,7 +207,7 @@ Cypress.Commands.add("joinBeta", (name: string): Chainable<JQuery<HTMLElement>> 
         .contains(".mx_BetaCard_title", name)
         .closest(".mx_BetaCard")
         .within(() => {
-            return cy.get(".mx_BetaCard_buttons").contains("Join the beta").click();
+            return cy.get(".mx_BetaCard_buttons").findByRole("button", { name: "Join the beta" }).click();
         });
 });
 
@@ -176,9 +216,60 @@ Cypress.Commands.add("leaveBeta", (name: string): Chainable<JQuery<HTMLElement>>
         .contains(".mx_BetaCard_title", name)
         .closest(".mx_BetaCard")
         .within(() => {
-            return cy.get(".mx_BetaCard_buttons").contains("Leave the beta").click();
+            return cy.get(".mx_BetaCard_buttons").findByRole("button", { name: "Leave the beta" }).click();
         });
 });
+
+Cypress.Commands.add(
+    "openSpotlightDialog",
+    (options?: Partial<Loggable & Timeoutable & Withinable & Shadow>): Chainable<JQuery<HTMLElement>> => {
+        cy.get(".mx_RoomSearch_spotlightTrigger", options).click({ force: true });
+        return cy.spotlightDialog(options);
+    },
+);
+
+Cypress.Commands.add(
+    "spotlightDialog",
+    (options?: Partial<Loggable & Timeoutable & Withinable & Shadow>): Chainable<JQuery<HTMLElement>> => {
+        return cy.get('[role=dialog][aria-label="Search Dialog"]', options);
+    },
+);
+
+Cypress.Commands.add(
+    "spotlightFilter",
+    (
+        filter: Filter | null,
+        options?: Partial<Loggable & Timeoutable & Withinable & Shadow>,
+    ): Chainable<JQuery<HTMLElement>> => {
+        let selector: string;
+        switch (filter) {
+            case Filter.People:
+                selector = "#mx_SpotlightDialog_button_startChat";
+                break;
+            case Filter.PublicRooms:
+                selector = "#mx_SpotlightDialog_button_explorePublicRooms";
+                break;
+            default:
+                selector = ".mx_SpotlightDialog_filter";
+                break;
+        }
+        return cy.get(selector, options).click();
+    },
+);
+
+Cypress.Commands.add(
+    "spotlightSearch",
+    (options?: Partial<Loggable & Timeoutable & Withinable & Shadow>): Chainable<JQuery<HTMLElement>> => {
+        return cy.get(".mx_SpotlightDialog_searchBox", options).findByRole("textbox", { name: "Search" });
+    },
+);
+
+Cypress.Commands.add(
+    "spotlightResults",
+    (options?: Partial<Loggable & Timeoutable & Withinable & Shadow>): Chainable<JQuery<HTMLElement>> => {
+        return cy.get(".mx_SpotlightDialog_section.mx_SpotlightDialog_results .mx_SpotlightDialog_option", options);
+    },
+);
 
 // Needed to make this file a module
 export {};

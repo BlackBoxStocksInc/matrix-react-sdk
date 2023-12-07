@@ -17,6 +17,7 @@ limitations under the License.
 import { _t } from "../../languageHandler";
 
 export enum NotificationColor {
+    Muted,
     // Inverted (None -> Red) because we do integer comparisons on this
     None, // nothing special
     // TODO: Remove bold with notifications: https://github.com/vector-im/element-web/issues/14227
@@ -29,16 +30,16 @@ export enum NotificationColor {
 export function humanReadableNotificationColor(color: NotificationColor): string {
     switch (color) {
         case NotificationColor.None:
-            return _t("None");
+            return _t("notifications|colour_none");
         case NotificationColor.Bold:
-            return _t("Bold");
+            return _t("notifications|colour_bold");
         case NotificationColor.Grey:
-            return _t("Grey");
+            return _t("notifications|colour_grey");
         case NotificationColor.Red:
-            return _t("Red");
+            return _t("notifications|colour_red");
         case NotificationColor.Unsent:
-            return _t("Unsent");
-        default:
-            return _t("unknown");
+            return _t("notifications|colour_unsent");
+        case NotificationColor.Muted:
+            return _t("notifications|colour_muted");
     }
 }
