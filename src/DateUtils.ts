@@ -117,7 +117,33 @@ export function formatFullTime(date: Date, showTwelveHour = false): string {
     return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
 }
 
-export function formatTime(date: Date, showTwelveHour = false): string {
+function convertToESTDate(inputDate) {
+    // Create formatter to extract EST components
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    });
+
+    // Extract parts
+    const parts = Object.fromEntries(formatter.formatToParts(inputDate).map(p => [p.type, p.value]));
+
+    // Reconstruct EST time string as ISO
+    const estIso = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+
+    // Return new Date object, which is interpreted as local -> becomes the EST moment in UTC
+    return new Date(estIso);
+    }
+
+export function formatTime(date: Date, showTwelveHour = false, defaultEST = true): string {
+    if (defaultEST) {
+        date = convertToESTDate(date);
+    }
     if (showTwelveHour) {
         return twelveHourTime(date);
     }
